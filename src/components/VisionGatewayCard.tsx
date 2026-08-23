@@ -85,15 +85,14 @@ export function VisionGatewayCard() {
 
         <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed">
           <li>
-            Get a DeepSeek key from{" "}
+            Get a DeepSeek key at{" "}
             <a
               href={DEEPSEEK_KEYS}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 underline underline-offset-2"
+              className="underline underline-offset-2"
             >
               platform.deepseek.com
-              <ExternalLink className="size-3" />
             </a>
             .
           </li>
@@ -103,10 +102,9 @@ export function VisionGatewayCard() {
               href={CF_WORKERS}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 underline underline-offset-2"
+              className="underline underline-offset-2"
             >
               Cloudflare Workers
-              <ExternalLink className="size-3" />
             </a>
             . Create an application and connect GitHub repo{" "}
             <span className="text-foreground">megabomb420/anime-buddy</span>, with root directory{" "}
