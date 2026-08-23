@@ -1,73 +1,50 @@
-# React + TypeScript + Vite
+# Anime Buddy
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Live app:** [https://megabomb420.github.io/anime-buddy/](https://megabomb420.github.io/anime-buddy/)
 
-Currently, two official plugins are available:
+**Source:** [https://github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Local-first anime companion. Discover titles, keep a library, scan figurines with the camera, and talk to **Buddy** — a locked-in anime friend who will not drop character.
 
-## React Compiler
+Your lists and taste stay on the device (IndexedDB). No accounts. No cloud library.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## What it does
 
-## Expanding the ESLint configuration
+| Screen | What you get |
+| --- | --- |
+| Home / Discover | AniList catalog, search, trending |
+| Scan | Camera or photo of a figurine / character art, matched to AniList |
+| Library | Watching, plan to watch, completed |
+| Buddy | Chat for recs. Same DeepSeek Worker as Scan. He stays Buddy. |
+| Profile | Taste, age gate, Worker URL for live vision + chat |
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+Catalog metadata is canonical from **AniList**. Scores/ratings may also show Jikan (MAL). AI never invents titles, scores, or streaming facts.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Live AI (Scan + Buddy)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+The PWA works without a key. Live identification and live Buddy chat need a Cloudflare Worker that holds your DeepSeek secret.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Deploy [`worker/`](./worker) from the Cloudflare dashboard (root directory = `worker`).
+2. Add a **Secret** named `DEEPSEEK_API_KEY` — never `VITE_`, never in the repo.
+3. Copy the `*.workers.dev` URL.
+4. Open the app → **Profile → Scan vision** → paste → wait for **Vision ready**.
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/megabomb420/anime-buddy/tree/main/worker)
+
+## Run it yourself
+
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Build for GitHub Pages:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+GITHUB_PAGES=true npm run build
 ```
+
+## Docs
+
+- [handover.md](./handover.md) — architecture, persona lock, deploy, what to do next
+- [worker/README.md](./worker/README.md) — Worker dashboard setup

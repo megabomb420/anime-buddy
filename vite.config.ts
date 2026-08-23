@@ -1,12 +1,25 @@
+import fs from "fs"
 import path from "path"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 import { VitePWA } from "vite-plugin-pwa"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
 
+function spaGithubPagesFallback() {
+  return {
+    name: "spa-github-pages-fallback",
+    closeBundle() {
+      const index = path.resolve(__dirname, "dist/index.html")
+      if (!fs.existsSync(index)) return
+      fs.copyFileSync(index, path.resolve(__dirname, "dist/404.html"))
+      fs.writeFileSync(path.resolve(__dirname, "dist/.nojekyll"), "")
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  base: process.env.GITHUB_PAGES === "true" ? "/anime-buddy/" : "./",
   plugins: [
     inspectAttr(),
     react(),
@@ -37,6 +50,7 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
       },
     }),
+    spaGithubPagesFallback(),
   ],
   server: {
     port: 3000,

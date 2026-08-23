@@ -8,9 +8,15 @@ import App from './App.tsx'
 // PWA service worker (auto-update). In dev this is a no-op stub.
 registerSW({ immediate: true })
 
+const rawBase = import.meta.env.BASE_URL
+const basename =
+  !rawBase || rawBase === "/" || rawBase === "./"
+    ? undefined
+    : rawBase.replace(/\/$/, "")
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <App />
     </BrowserRouter>
   </StrictMode>,
