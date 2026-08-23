@@ -168,18 +168,17 @@ VITE_AI_PROVIDER=mock     # mock | deepseek; a Worker URL implies live DeepSeek
 
 ## Deploy
 
-**Public PWA** — GitHub Actions [`.github/workflows/pages.yml`](./.github/workflows/pages.yml):
+**Public PWA** — GitHub Pages from the `gh-pages` branch:
 
-- `push` to `main` or `workflow_dispatch`
-- `GITHUB_PAGES=true npm run build`
-- `actions/upload-pages-artifact` + `actions/deploy-pages`
 - Live: https://megabomb420.github.io/anime-buddy/
-
-The Pages REST API may 403 from this GitHub App token. The workflow token (`pages: write` + `id-token: write`) is what actually publishes. First run creates the Pages site.
+- Workflow [`.github/workflows/pages.yml`](./.github/workflows/pages.yml) builds on `push` to `main` (`GITHUB_PAGES=true`) and publishes `dist/` to `gh-pages`
+- The GitHub App token **cannot** call “Create a Pages site”. Pushing `gh-pages` is what turned Pages on (`source.branch=gh-pages`)
+- SPA refreshes use `dist/404.html` (copy of `index.html`)
 
 **Worker** — Cloudflare dashboard, root = `worker`, then add `DEEPSEEK_API_KEY`. Redeploy after `worker/src/**` changes so the persona lock is live.
 
 **Grok / Vercel** — platform-side; not triggered from this handover.
+
 
 ---
 
@@ -197,12 +196,13 @@ The Pages REST API may 403 from this GitHub App token. The workflow token (`page
 
 ## What the next person / owner must do
 
-1. Confirm GitHub Actions **Deploy GitHub Pages** is green and the live URL loads.
+1. Live app loads: https://megabomb420.github.io/anime-buddy/
 2. Deploy / redeploy the Worker from `worker/` on Cloudflare.
 3. Put `DEEPSEEK_API_KEY` in Worker secrets.
 4. Open the live app → Profile → Scan vision → paste the `*.workers.dev` URL until **Vision ready**.
 5. Optional: repo secret `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` if you want Actions to deploy the Worker.
 6. Hardware camera was not QA’d on a physical phone. File-upload path was.
+
 
 ---
 
