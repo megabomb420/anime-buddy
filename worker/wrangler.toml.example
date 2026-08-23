@@ -1,15 +1,13 @@
-# Copy to wrangler.toml and fill in values. Never commit real secrets —
-# use `wrangler secret put DEEPSEEK_API_KEY` / `wrangler secret put TMDB_API_KEY`
-# for production values.
+# Copy to wrangler.toml for local `wrangler dev` if you need to change CORS.
+# Production secrets: Cloudflare dashboard → Worker → Settings →
+# Variables and Secrets → Add → Secret
+#   DEEPSEEK_API_KEY
+#   TMDB_API_KEY
+# Never put those values in this file — empty [vars] placeholders overwrite secrets on deploy.
 
 name = "anime-buddy-worker"
 main = "src/index.ts"
-compatibility_date = "2025-08-01"
+compatibility_date = "2026-08-23"
 
 [vars]
-# Comma-separated allowed CORS origins for the PWA.
-ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:7100"
-
-# Set via `wrangler secret put`:
-# DEEPSEEK_API_KEY
-# TMDB_API_KEY
+ALLOWED_ORIGINS = "*"

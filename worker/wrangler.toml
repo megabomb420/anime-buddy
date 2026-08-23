@@ -1,0 +1,11 @@
+# Deploy from this folder (Cloudflare dashboard → Connect Git, root = worker).
+# Secrets are NEVER listed here — dashboard / wrangler secret put only.
+# Putting empty placeholders in [vars] would overwrite real secrets on deploy.
+
+name = "anime-buddy-worker"
+main = "src/index.ts"
+compatibility_date = "2026-08-23"
+
+[vars]
+# PWA + preview origins vary; the Worker holds keys, not user data.
+ALLOWED_ORIGINS = "*"

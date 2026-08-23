@@ -14,18 +14,17 @@
  *   POST /api/ai/vision         — DeepSeek multimodal (Anime Lens)
  *   GET  /api/tmdb/*            — TMDB passthrough with secret key
  *
- * Secrets (wrangler secret put ...):
+ * Secrets: Cloudflare dashboard → Settings → Variables and Secrets
  *   DEEPSEEK_API_KEY
  *   TMDB_API_KEY
  *
- * Local dev: copy wrangler.toml.example to wrangler.toml, fill vars, run
- * `npm run dev` in this directory.
+ * wrangler.toml is committed (no secrets). Deploy from this folder.
  */
 
 export interface Env {
-  DEEPSEEK_API_KEY: string;
-  TMDB_API_KEY: string;
-  /** Comma-separated allowed origins for CORS, e.g. "http://localhost:3000". */
+  DEEPSEEK_API_KEY?: string;
+  TMDB_API_KEY?: string;
+  /** Comma-separated allowed origins for CORS, e.g. "*". */
   ALLOWED_ORIGINS?: string;
 }
 
@@ -52,6 +51,11 @@ function json(data: unknown, init: ResponseInit, cors: Record<string, string>): 
   });
 }
 
+function requireDeepSeekKey(env: Env): string {
+  if (!env.DEEPSEEK_API_KEY) throw new Error("not_configured");
+  return env.DEEPSEEK_API_KEY;
+}
+
 /** Call DeepSeek chat completions with a system+user message pair. */
 async function deepseekChat(
   env: Env,
@@ -63,7 +67,7 @@ async function deepseekChat(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
+      Authorization: `Bearer ${requireDeepSeekKey(env)}`,
     },
     body: JSON.stringify({
       model: "deepseek-chat",
@@ -110,7 +114,7 @@ async function deepseekVision(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
+      Authorization: `Bearer ${requireDeepSeekKey(env)}`,
     },
     body: JSON.stringify({
       model: "deepseek-v4-flash-vision-exp",
@@ -157,11 +161,23 @@ export default {
     try {
       // --- health ---
       if (url.pathname === "/api/health") {
-        return json({ ok: true, service: "anime-buddy-worker" }, { status: 200 }, cors);
+        return json(
+          {
+            ok: true,
+            service: "anime-buddy-worker",
+            vision: Boolean(env.DEEPSEEK_API_KEY),
+            tmdb: Boolean(env.TMDB_API_KEY),
+          },
+          { status: 200 },
+          cors,
+        );
       }
 
       // --- TMDB passthrough ---
       if (url.pathname.startsWith("/api/tmdb/")) {
+        if (!env.TMDB_API_KEY) {
+          return json({ error: "not_configured" }, { status: 503 }, cors);
+        }
         const path = url.pathname.slice("/api/tmdb".length);
         const target = new URL(`${TMDB_URL}${path}${url.search}`);
         target.searchParams.set("api_key", env.TMDB_API_KEY);
@@ -177,6 +193,13 @@ export default {
 
       // --- AI routes ---
       if (url.pathname.startsWith("/api/ai/") && request.method === "POST") {
+        if (!env.DEEPSEEK_API_KEY) {
+          return json(
+            { error: "not_configured", candidates: [], recognition: { detected: false } },
+            { status: 503 },
+            cors,
+          );
+        }
         const body = (await request.json()) as Record<string, unknown>;
 
         switch (url.pathname) {
@@ -227,23 +250,15 @@ export default {
           }
 
           case "/api/ai/vision": {
-            if (!env.DEEPSEEK_API_KEY) {
-              return json(
-                {
-                  error: "not_configured",
-                  candidates: [],
-                  recognition: { detected: false },
-                },
-                { status: 503 },
-                cors,
-              );
-            }
             const imageBase64 = String(body.imageBase64 ?? "").replace(
               /^data:image\/[a-zA-Z0-9+.-]+;base64,/,
               "",
             );
             if (!imageBase64) {
               return json({ error: "imageBase64 required", candidates: [] }, { status: 400 }, cors);
+            }
+            if (imageBase64.length > 5_500_000) {
+              return json({ error: "payload_too_large", candidates: [] }, { status: 413 }, cors);
             }
             const vision = await deepseekVision(env, imageBase64);
             return json(vision, { status: 200 }, cors);
@@ -257,7 +272,8 @@ export default {
       return json({ error: "not found" }, { status: 404 }, cors);
     } catch (err) {
       const message = err instanceof Error ? err.message : "internal error";
-      return json({ error: message }, { status: 500 }, cors);
+      const status = message === "not_configured" ? 503 : 500;
+      return json({ error: message }, { status }, cors);
     }
   },
 };

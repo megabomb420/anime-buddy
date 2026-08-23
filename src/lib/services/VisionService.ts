@@ -131,7 +131,7 @@ async function callWorkerVision(imageBase64: string): Promise<{
     return {
       ok: false,
       error: "not_configured",
-      message: "Scan needs a DeepSeek API key on the Worker (DEEPSEEK_API_KEY) to run V4 Flash vision.",
+      message: "The Worker is up, but DeepSeek isn’t on it yet. In Cloudflare: Worker → Settings → Variables and Secrets → add a Secret named DEEPSEEK_API_KEY.",
     };
   }
   if (!res.ok) {
@@ -203,7 +203,7 @@ export async function analyzeCapture(image: Blob): Promise<ScanOutcome> {
   if (!config.workerUrl) {
     gatewayError = "not_configured";
     gatewayMessage =
-      "Scan needs the Cloudflare Worker (VITE_WORKER_URL) with DEEPSEEK_API_KEY to run V4 Flash vision.";
+      "Scan talks to your Cloudflare Worker. Open Profile and paste the workers.dev URL after you add the DeepSeek secret there.";
   } else {
     try {
       const response = await callWorkerVision(imageBase64);

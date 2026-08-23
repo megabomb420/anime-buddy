@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { VisionGatewayCard } from "@/components/VisionGatewayCard";
 import { persistence } from "@/lib/db/persistence";
 import { db } from "@/lib/db/database";
 import { tasteService } from "@/lib/services/TasteService";
@@ -43,6 +44,14 @@ export default function ProfilePage() {
   const [genreDistribution, setGenreDistribution] = useState<Record<string, number>>({});
   const [ratingDistribution, setRatingDistribution] = useState<Record<number, number>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#vision") return;
+    requestAnimationFrame(() => {
+      document.getElementById("vision")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -132,6 +141,8 @@ export default function ProfilePage() {
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold">Profile</h1>
+
+      <VisionGatewayCard />
 
       {/* Stats grid */}
       {stats && (

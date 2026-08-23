@@ -1,43 +1,46 @@
 # Anime Buddy Worker
 
-Small, application-specific Cloudflare Worker that keeps private API keys
-(DeepSeek, TMDB) off the client. It is **not** the main backend — all user
-data stays local in the PWA's IndexedDB.
+Small Cloudflare Worker that keeps private API keys (DeepSeek, TMDB) off the
+client. It is **not** the main backend — all user data stays local in the PWA.
 
-## Setup
+## Dashboard setup (no CLI)
 
-```bash
-cd worker
-npm install
-cp wrangler.toml.example wrangler.toml   # fill in ALLOWED_ORIGINS
-npx wrangler secret put DEEPSEEK_API_KEY
-npx wrangler secret put TMDB_API_KEY
-```
+1. Create a DeepSeek API key at [platform.deepseek.com](https://platform.deepseek.com/api_keys).
+2. Open [Cloudflare Workers](https://dash.cloudflare.com/?to=/:account/workers-and-pages).
+3. **Create** → import GitHub repo `megabomb420/anime-buddy`.
+   Set the **root directory** to `worker`.
+4. After the first deploy, open the Worker → **Settings** → **Variables and Secrets** → **Add**.
+   - Type: **Secret**
+   - Name: `DEEPSEEK_API_KEY`
+   - Value: your DeepSeek key
+5. Optional: add another secret named `TMDB_API_KEY` for regional availability.
+6. Copy the `*.workers.dev` URL and paste it into Anime Buddy → **Profile → Scan vision**.
 
-## Run / deploy
+One-click deploy:
 
-```bash
-npm run dev        # local dev on http://localhost:8787
-npm run typecheck  # TS check
-npm run deploy     # deploy to Cloudflare
-```
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/megabomb420/anime-buddy/tree/main/worker)
 
-After deploying, point the PWA at it:
+After that button, you still add `DEEPSEEK_API_KEY` as a secret (step 4).
 
-```
-# .env.local in the repo root
-VITE_WORKER_URL=https://anime-buddy-worker.<your-subdomain>.workers.dev
-VITE_AI_PROVIDER=deepseek
-```
+Do **not** put the key in the app, in `VITE_` env vars, or in `wrangler.toml`.
 
 ## Routes
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/health` | Liveness check |
+| `GET /api/health` | Liveness. `{ ok, vision, tmdb }` — `vision` is true only when the secret is set |
 | `POST /api/ai/chat` | Buddy conversation (DeepSeek) |
 | `POST /api/ai/recommend` | Semantic reranking of a 10–30 candidate pool |
 | `POST /api/ai/taste` | Taste DNA interpretation |
 | `POST /api/ai/signals` | Taste-signal extraction from notes |
-| `POST /api/ai/vision` | DeepSeek V4 Flash multimodal (`deepseek-v4-flash-vision-exp`). Returns structured recognition JSON + candidates. 503 if `DEEPSEEK_API_KEY` is missing. |
+| `POST /api/ai/vision` | Anime Lens (DeepSeek V4 Flash). `503` if the secret is missing |
 | `GET /api/tmdb/*` | TMDB passthrough with secret API key |
+
+## CLI (optional)
+
+```bash
+cd worker
+npm install
+npx wrangler secret put DEEPSEEK_API_KEY
+npm run deploy
+```

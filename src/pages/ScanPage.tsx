@@ -11,6 +11,7 @@ import {
 } from "@/lib/services/VisionService";
 import { persistence } from "@/lib/db/persistence";
 import { blobToObjectUrl } from "@/lib/image/compress";
+import { getWorkerUrl } from "@/lib/worker-gateway";
 import { cn } from "@/lib/utils";
 import type { AnimeSummary } from "@/types/anime";
 
@@ -260,6 +261,14 @@ export default function ScanPage() {
             <p className="text-sm leading-relaxed text-muted-foreground">
               Scan a figurine, print, or piece of merch. I'll guess the character, then match a real title from the catalog — never invent one.
             </p>
+            {!getWorkerUrl() && (
+              <p className="text-sm text-muted-foreground">
+                Identification needs your Cloudflare Worker.{" "}
+                <Link to="/profile#vision" className="underline underline-offset-2">
+                  Connect vision
+                </Link>
+              </p>
+            )}
             <Button className="h-12 w-full rounded-full" onClick={() => void startCamera()}>
               Open camera
             </Button>
@@ -373,7 +382,12 @@ export default function ScanPage() {
               </div>
             )}
 
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row">
+              {outcome.gatewayError === "not_configured" && (
+                <Button asChild className="h-11 rounded-full">
+                  <Link to="/profile#vision">Connect vision</Link>
+                </Button>
+              )}
               <Button variant="secondary" className="h-11 flex-1 rounded-full" onClick={retake}>Try again</Button>
               <Button asChild variant="secondary" className="h-11 flex-1 rounded-full">
                 <Link to="/discover">Search catalog</Link>

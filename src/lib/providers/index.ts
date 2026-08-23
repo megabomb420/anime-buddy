@@ -16,7 +16,9 @@ export function createAIProvider(): AIProvider {
 }
 
 export const providers = {
-  ai: createAIProvider(),
+  get ai(): AIProvider {
+    return createAIProvider();
+  },
   catalog: new AniListProvider(),
   malExtras: new JikanProvider(),
   tmdb: new TMDBProvider(),
