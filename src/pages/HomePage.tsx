@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
+  Camera,
   Compass,
   Gem,
   MessageCircle,
@@ -207,10 +208,11 @@ export default function HomePage() {
       )}
 
       {/* Quick actions */}
-      <section className="grid grid-cols-3 gap-3">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { icon: MessageCircle, label: "Ask Buddy", to: "/buddy" },
+          { icon: Camera, label: "Scan", to: "/scan" },
           { icon: Compass, label: "Discover", to: "/discover" },
+          { icon: MessageCircle, label: "Ask Buddy", to: "/buddy" },
           { icon: Sparkles, label: "Surprise Me", action: loadSurprise },
         ].map((item) => (
           <Button

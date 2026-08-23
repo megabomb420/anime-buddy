@@ -15,7 +15,7 @@ import { resolveAgeGuide } from "@/lib/age/normalize";
 import { resolveAvailability } from "@/lib/availability/resolve";
 import { persistence } from "@/lib/db/persistence";
 import { providers } from "@/lib/providers";
-import type { AnimeSummary } from "@/types/anime";
+import type { AnimeSummary, CharacterSummary } from "@/types/anime";
 
 /** How long cached MAL extras / availability stay fresh. */
 const MAL_EXTRAS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -63,6 +63,20 @@ export class AnimeCatalogService {
     const results = await anilist.getSeasonal(season, year, limit);
     void Promise.all(results.map((r) => persistence.cacheAnime(r)));
     return results;
+  }
+
+  async searchCharacters(query: string, limit = 8): Promise<CharacterSummary[]> {
+    const results = await providers.catalog.searchCharacters(query, limit);
+    void Promise.all(results.map((c) => persistence.cacheCharacter(c)));
+    return results;
+  }
+
+  async getCharacter(characterId: number): Promise<CharacterSummary | null> {
+    const cached = await persistence.getCharacter(characterId);
+    if (cached) return cached;
+    const fresh = await providers.catalog.getCharacter(characterId);
+    if (fresh) await persistence.cacheCharacter(fresh);
+    return fresh;
   }
 
   /**

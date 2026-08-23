@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router";
+import { Route, Routes, useLocation } from "react-router";
 import { BottomNav } from "@/components/BottomNav";
 import BuddyPage from "@/pages/BuddyPage";
 import DiscoverPage from "@/pages/DiscoverPage";
@@ -8,28 +8,40 @@ import ProfilePage from "@/pages/ProfilePage";
 import AnimeDetailPage from "@/pages/AnimeDetailPage";
 import CharactersPage from "@/pages/CharactersPage";
 import CharacterDetailPage from "@/pages/CharacterDetailPage";
+import ScanPage from "@/pages/ScanPage";
 
 /**
- * App shell — mobile-first, dark-first. Five top-level destinations with
- * bottom navigation. Feature screens (anime detail, character detail,
- * Tonight, Anime Lens, …) mount under these routes as they're implemented.
+ * App shell — mobile-first, dark-first.
+ * Scan is a full-bleed camera destination; other tabs keep the compact column.
  */
 export default function App() {
+  const { pathname } = useLocation();
+  const fullBleed = pathname === "/scan";
+
   return (
     <div className="min-h-dvh bg-background text-foreground">
-      <main className="mx-auto max-w-md px-4 pb-24 pt-6">
+      {fullBleed ? (
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/discover" element={<DiscoverPage />} />
-          <Route path="/buddy" element={<BuddyPage />} />
-          <Route path="/library" element={<LibraryPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/anime/:anilistId" element={<AnimeDetailPage />} />
-          <Route path="/characters" element={<CharactersPage />} />
-          <Route path="/character/:characterId" element={<CharacterDetailPage />} />
+          <Route path="/scan" element={<ScanPage />} />
         </Routes>
-      </main>
-      <BottomNav />
+      ) : (
+        <>
+          <main className="mx-auto max-w-md px-4 pb-24 pt-6">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/discover" element={<DiscoverPage />} />
+              <Route path="/buddy" element={<BuddyPage />} />
+              <Route path="/library" element={<LibraryPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/anime/:anilistId" element={<AnimeDetailPage />} />
+              <Route path="/characters" element={<CharactersPage />} />
+              <Route path="/character/:characterId" element={<CharacterDetailPage />} />
+              <Route path="/scan" element={<ScanPage />} />
+            </Routes>
+          </main>
+          <BottomNav />
+        </>
+      )}
     </div>
   );
 }

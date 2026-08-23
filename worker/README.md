@@ -39,5 +39,5 @@ VITE_AI_PROVIDER=deepseek
 | `POST /api/ai/recommend` | Semantic reranking of a 10–30 candidate pool |
 | `POST /api/ai/taste` | Taste DNA interpretation |
 | `POST /api/ai/signals` | Taste-signal extraction from notes |
-| `POST /api/ai/vision` | Anime Lens (returns 501 until a multimodal model is wired) |
+| `POST /api/ai/vision` | DeepSeek V4 Flash multimodal (`deepseek-v4-flash-vision-exp`). Returns structured recognition JSON + candidates. 503 if `DEEPSEEK_API_KEY` is missing. |
 | `GET /api/tmdb/*` | TMDB passthrough with secret API key |

@@ -80,6 +80,71 @@ async function deepseekChat(
   return data.choices?.[0]?.message?.content ?? "";
 }
 
+const VISION_SYSTEM =
+  "You identify anime figurines, character artwork, manga covers, and merchandise in photographs. " +
+  "Return ONLY JSON: {\"detected\":boolean,\"objectType\":\"figurine\"|\"character_art\"|\"merchandise\"|\"manga\"|\"unknown\"," +
+  "\"characterName\":string|null,\"franchiseTitle\":string|null,\"animeTitle\":string|null,\"confidence\":number," +
+  "\"alternatives\":[{\"characterName\":string|null,\"animeTitle\":string|null,\"confidence\":number}]," +
+  "\"reasoningSummary\":string}. Never invent titles. If uncertain, lower confidence and fill alternatives. " +
+  "If not anime-related, detected=false. Do not mention streaming, scores, or age ratings.";
+
+function extractJsonObject(text: string): Record<string, unknown> {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const raw = fenced?.[1] ?? trimmed;
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) return {};
+  return JSON.parse(raw.slice(start, end + 1)) as Record<string, unknown>;
+}
+
+async function deepseekVision(
+  env: Env,
+  imageBase64: string,
+): Promise<{
+  candidates: Array<{ name: string; kind: "anime" | "character"; confidence: number }>;
+  rawDescription?: string;
+  recognition: Record<string, unknown>;
+}> {
+  const res = await fetch(DEEPSEEK_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env.DEEPSEEK_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-v4-flash-vision-exp",
+      temperature: 0.2,
+      max_tokens: 700,
+      messages: [
+        { role: "system", content: VISION_SYSTEM },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Identify the anime figurine, character, or merchandise. JSON only." },
+            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error(`DeepSeek vision HTTP ${res.status}`);
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content ?? "";
+  const recognition = extractJsonObject(content);
+  const candidates: Array<{ name: string; kind: "anime" | "character"; confidence: number }> = [];
+  const character = typeof recognition.characterName === "string" ? recognition.characterName : "";
+  const anime = typeof recognition.animeTitle === "string" ? recognition.animeTitle : "";
+  const conf = typeof recognition.confidence === "number" ? recognition.confidence : 0;
+  if (character) candidates.push({ name: character, kind: "character", confidence: conf });
+  if (anime) candidates.push({ name: anime, kind: "anime", confidence: conf });
+  return {
+    candidates,
+    rawDescription: typeof recognition.reasoningSummary === "string" ? recognition.reasoningSummary : content,
+    recognition,
+  };
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const cors = corsHeaders(request, env);
@@ -162,18 +227,26 @@ export default {
           }
 
           case "/api/ai/vision": {
-            // Anime Lens. TODO: confirm DeepSeek multimodal endpoint/model at
-            // integration time; if unavailable, swap this single route to a
-            // vision-capable model without touching the frontend contract.
-            // Contract: return {"candidates":[{"name":string,"kind":"anime"|
-            // "character","confidence":number}], "rawDescription"?: string}.
-            // The app resolves names against AniList — AI output is never
-            // authoritative metadata.
-            return json(
-              { error: "vision route not yet wired to a multimodal model", candidates: [] },
-              { status: 501 },
-              cors,
+            if (!env.DEEPSEEK_API_KEY) {
+              return json(
+                {
+                  error: "not_configured",
+                  candidates: [],
+                  recognition: { detected: false },
+                },
+                { status: 503 },
+                cors,
+              );
+            }
+            const imageBase64 = String(body.imageBase64 ?? "").replace(
+              /^data:image\/[a-zA-Z0-9+.-]+;base64,/,
+              "",
             );
+            if (!imageBase64) {
+              return json({ error: "imageBase64 required", candidates: [] }, { status: 400 }, cors);
+            }
+            const vision = await deepseekVision(env, imageBase64);
+            return json(vision, { status: 200 }, cors);
           }
 
           default:

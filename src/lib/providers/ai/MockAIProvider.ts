@@ -39,8 +39,11 @@ export class MockAIProvider implements AIProvider {
   }
 
   async analyzeImage(_image: Blob): Promise<ImageAnalysisResult> {
-    // Mock never pretends to recognize anything — low confidence by design.
-    return { candidates: [], rawDescription: "Mock provider: image recognition unavailable." };
+    return {
+      candidates: [],
+      rawDescription: "Mock provider: image recognition unavailable.",
+      recognition: { detected: false, reasoningSummary: "Mock mode cannot identify photos." },
+    };
   }
 
   async analyzeTaste(input: TasteAnalysisInput): Promise<string> {

@@ -13,6 +13,8 @@ export interface CatalogProvider {
   searchAnime(query: string, limit?: number): Promise<AnimeSummary[]>;
   getAnime(anilistId: number): Promise<AnimeSummary | null>;
   getCharacters(anilistId: number): Promise<CharacterSummary[]>;
+  getCharacter(characterId: number): Promise<CharacterSummary | null>;
+  searchCharacters(query: string, limit?: number): Promise<CharacterSummary[]>;
 }
 
 /** Secondary source for MAL community score + MAL content rating (Jikan). */

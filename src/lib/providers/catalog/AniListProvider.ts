@@ -228,4 +228,84 @@ export class AniListProvider implements CatalogProvider {
       cachedAt: Date.now(),
     }));
   }
+
+  async getCharacter(characterId: number): Promise<CharacterSummary | null> {
+    const data = await gql<{
+      Character: {
+        id: number;
+        name: { full: string; native?: string | null };
+        image?: { large?: string } | null;
+        description?: string | null;
+        favourites?: number | null;
+        media?: { nodes?: Array<{ id: number }> | null } | null;
+      } | null;
+    }>(
+      `query ($id: Int!) {
+        Character(id: $id) {
+          id
+          name { full native }
+          image { large }
+          description
+          favourites
+          media(type: ANIME, sort: POPULARITY_DESC, perPage: 8) {
+            nodes { id }
+          }
+        }
+      }`,
+      { id: characterId },
+    );
+    const c = data.Character;
+    if (!c) return null;
+    return {
+      id: c.id,
+      name: c.name.full,
+      nameNative: c.name.native ?? undefined,
+      image: c.image?.large ?? undefined,
+      animeIds: (c.media?.nodes ?? []).map((n) => n.id),
+      description: c.description ?? undefined,
+      favorites: c.favourites ?? undefined,
+      cachedAt: Date.now(),
+    };
+  }
+
+  async searchCharacters(query: string, limit = 8): Promise<CharacterSummary[]> {
+    const data = await gql<{
+      Page: {
+        characters: Array<{
+          id: number;
+          name: { full: string; native?: string | null };
+          image?: { large?: string } | null;
+          description?: string | null;
+          favourites?: number | null;
+          media?: { nodes?: Array<{ id: number }> | null } | null;
+        }>;
+      };
+    }>(
+      `query ($search: String!, $perPage: Int!) {
+        Page(perPage: $perPage) {
+          characters(search: $search, sort: SEARCH_MATCH) {
+            id
+            name { full native }
+            image { large }
+            description
+            favourites
+            media(type: ANIME, sort: POPULARITY_DESC, perPage: 4) {
+              nodes { id }
+            }
+          }
+        }
+      }`,
+      { search: query, perPage: limit },
+    );
+    return data.Page.characters.map((c) => ({
+      id: c.id,
+      name: c.name.full,
+      nameNative: c.name.native ?? undefined,
+      image: c.image?.large ?? undefined,
+      animeIds: (c.media?.nodes ?? []).map((n) => n.id),
+      description: c.description ?? undefined,
+      favorites: c.favourites ?? undefined,
+      cachedAt: Date.now(),
+    }));
+  }
 }

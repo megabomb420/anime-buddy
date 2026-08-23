@@ -73,6 +73,26 @@ export interface ImageCandidate {
 export interface ImageAnalysisResult {
   candidates: ImageCandidate[];
   rawDescription?: string;
+  recognition?: VisualRecognitionResult;
+}
+
+export type VisualObjectType = "figurine" | "character_art" | "merchandise" | "manga" | "unknown";
+
+/** Structured multimodal recognition. AI identifies; the catalog is canonical. */
+export interface VisualRecognitionResult {
+  detected: boolean;
+  objectType?: VisualObjectType;
+  characterName?: string;
+  franchiseTitle?: string;
+  animeTitle?: string;
+  /** 0..1. Low values must be shown as uncertain — never implied as fact. */
+  confidence?: number;
+  alternatives?: Array<{
+    characterName?: string;
+    animeTitle?: string;
+    confidence?: number;
+  }>;
+  reasoningSummary?: string;
 }
 
 export interface AIProvider {
