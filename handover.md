@@ -29,7 +29,7 @@ Canonical catalog: **AniList GraphQL**. Secondary: Jikan (MAL score/rating), TMD
 | **App (GitHub Pages)** | https://megabomb420.github.io/anime-buddy/ |
 | **Source** | https://github.com/megabomb420/anime-buddy |
 | Worker one-click | https://deploy.workers.cloudflare.com/?url=https://github.com/megabomb420/anime-buddy/tree/main/worker |
-| Worker (after user deploys) | `https://anime-buddy-worker.<account>.workers.dev` — paste in Profile → Scan vision |
+| **Worker (live)** | https://anime-buddy-worker.whip-blanket.workers.dev — baked into Scan + Buddy |
 
 Do **not** invent a `*.grok.me` host. Grok App Builder deploys to Vercel/`{name}.grok.me` from the platform; this agent cannot trigger that. The public PWA is GitHub Pages.
 
@@ -90,9 +90,9 @@ Captures are **not** persisted. The DeepSeek key is **never** `VITE_` and never 
 
 Confidence bands: high / likely / ambiguous / none. Never treat a low-confidence guess as fact.
 
-If the Worker URL or secret is missing, Scan still opens. Identification returns `not_configured` with a recovery path.
+If the Worker is down or the DeepSeek secret is missing, Scan still opens. Identification returns `not_configured` with a recovery path.
 
-In-app connect: **Profile → Scan vision** (paste-first `VisionGatewayCard`). Stored in `localStorage` key `anime-buddy.worker-url`.
+The live Worker is baked in: `https://anime-buddy-worker.whip-blanket.workers.dev`. Scan and Buddy use it with no Profile paste. Profile can override (`localStorage` key `anime-buddy.worker-url`); reset returns to the built-in origin.
 
 ---
 
@@ -104,7 +104,7 @@ Buddy is a **person** in the app (he/him). The lock is defense in depth — not 
 2. **Sanitize** incoming messages: drop injected `system` roles, cap 12 turns / 2000 chars.
 3. **Jailbreak detector** (EN + PL) runs locally **and** on the Worker. Hits get a locked reply, no catalog cards.
 4. **Output leak guard**: if the model names a vendor/model or echoes a hijack, replace with the locked reply.
-5. **Mock path** (no Worker) still answers in character via `mockBuddyReply`.
+5. **Mock path** is unused while the baked-in Worker is reachable; it still answers in character if the Worker is down.
 
 Locked replies:
 
@@ -160,7 +160,7 @@ CLI deploy is optional (`wrangler-action` workflow is `workflow_dispatch` and ne
 App (never commit secrets):
 
 ```
-VITE_WORKER_URL=          # optional; Profile paste overrides in the browser
+VITE_WORKER_URL=https://anime-buddy-worker.whip-blanket.workers.dev  # optional build override; source already defaults here
 VITE_AI_PROVIDER=mock     # mock | deepseek; a Worker URL implies live DeepSeek
 ```
 

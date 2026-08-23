@@ -14,7 +14,7 @@ client. It is **not** the main backend — all user data stays local in the PWA.
    - Name: `DEEPSEEK_API_KEY`
    - Value: your DeepSeek key
 5. Optional: add another secret named `TMDB_API_KEY` for regional availability.
-6. Copy the `*.workers.dev` URL and paste it into Anime Buddy → **Profile → Scan vision**.
+6. The public app is already pointed at `https://anime-buddy-worker.whip-blanket.workers.dev`. If you deploy your own Worker, override that address in Anime Buddy → **Profile → Scan + Buddy**.
 
 One-click deploy:
 

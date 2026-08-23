@@ -1,7 +1,7 @@
 /**
  * Runtime configuration.
  * No secrets belong here: private API keys live ONLY in the Cloudflare Worker.
- * The Worker URL may come from VITE_WORKER_URL or a browser override (Profile).
+ * Scan + Buddy use the baked-in Worker URL; Profile can override it.
  */
 
 import { getWorkerUrl } from "@/lib/worker-gateway";

@@ -28,8 +28,8 @@ export async function replyAsBuddy(
       return guardReply(raw, last);
     } catch {
       return looksPolish(last)
-        ? "DeepSeek milczy. Sprawdź Workera w Profilu — ten sam co Scan."
-        : "DeepSeek went quiet. Check the Worker in Profile — same one Scan uses.";
+        ? "DeepSeek milczy. Spróbuj jeszcze raz za chwilę."
+        : "DeepSeek went quiet. Try me again in a second.";
     }
   }
 

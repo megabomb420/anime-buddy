@@ -29,6 +29,7 @@ jobs:
       - run: npm run build
         env:
           GITHUB_PAGES: "true"
+          VITE_WORKER_URL: "https://anime-buddy-worker.whip-blanket.workers.dev"
       - name: SPA fallback for client routes
         run: |
           cp dist/index.html dist/404.html

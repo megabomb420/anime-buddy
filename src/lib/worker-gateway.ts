@@ -1,9 +1,13 @@
 /**
- * Cloudflare Worker URL — stored in this browser only.
+ * Cloudflare Worker URL.
  * The DeepSeek key never lives here; it stays a Worker secret.
+ * Scan + Buddy use the baked-in Worker unless Profile overrides it.
  */
 
 const STORAGE_KEY = "anime-buddy.worker-url";
+
+/** Public Worker origin. Not a secret. */
+export const DEFAULT_WORKER_URL = "https://anime-buddy-worker.whip-blanket.workers.dev";
 
 export type WorkerHealth = {
   ok: boolean;
@@ -53,7 +57,7 @@ export function setStoredWorkerUrl(url: string): string {
 }
 
 export function getWorkerUrl(): string {
-  return getStoredWorkerUrl() || envWorkerUrl();
+  return getStoredWorkerUrl() || envWorkerUrl() || DEFAULT_WORKER_URL;
 }
 
 export async function probeWorker(url: string): Promise<WorkerHealth> {

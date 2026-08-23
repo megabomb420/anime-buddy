@@ -4,6 +4,8 @@
 
 **Source:** [https://github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
 
+**Live Worker (Scan + Buddy):** [https://anime-buddy-worker.whip-blanket.workers.dev](https://anime-buddy-worker.whip-blanket.workers.dev)
+
 Local-first anime companion. Discover titles, keep a library, scan figurines with the camera, and talk to **Buddy** — a locked-in anime friend who will not drop character.
 
 Your lists and taste stay on the device (IndexedDB). No accounts. No cloud library.
@@ -16,18 +18,19 @@ Your lists and taste stay on the device (IndexedDB). No accounts. No cloud libra
 | Scan | Camera or photo of a figurine / character art, matched to AniList |
 | Library | Watching, plan to watch, completed |
 | Buddy | Chat for recs. Same DeepSeek Worker as Scan. He stays Buddy. |
-| Profile | Taste, age gate, Worker URL for live vision + chat |
+| Profile | Taste, age gate, Worker status (override only if you move it) |
 
 Catalog metadata is canonical from **AniList**. Scores/ratings may also show Jikan (MAL). AI never invents titles, scores, or streaming facts.
 
 ## Live AI (Scan + Buddy)
 
-The PWA works without a key. Live identification and live Buddy chat need a Cloudflare Worker that holds your DeepSeek secret.
+Scan identification and Buddy chat are **already wired** to:
 
-1. Deploy [`worker/`](./worker) from the Cloudflare dashboard (root directory = `worker`).
-2. Add a **Secret** named `DEEPSEEK_API_KEY` — never `VITE_`, never in the repo.
-3. Copy the `*.workers.dev` URL.
-4. Open the app → **Profile → Scan vision** → paste → wait for **Vision ready**.
+`https://anime-buddy-worker.whip-blanket.workers.dev`
+
+The DeepSeek key stays a Cloudflare Worker secret — never in this repo, never `VITE_`. You do not paste a Worker URL to use Scan or Buddy.
+
+To run your own Worker instead: deploy [`worker/`](./worker), add secret `DEEPSEEK_API_KEY`, then override the address in **Profile → Scan + Buddy**.
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/megabomb420/anime-buddy/tree/main/worker)
 
