@@ -1,0 +1,352 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router";
+import {
+  Compass,
+  Gem,
+  MessageCircle,
+  Sparkles,
+  Moon,
+  Heart,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { AgeBadge } from "@/components/AgeBadge";
+import { persistence } from "@/lib/db/persistence";
+import { recommendationService } from "@/lib/services/RecommendationService";
+import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
+import { db } from "@/lib/db/database";
+import type { AnimeSummary } from "@/types/anime";
+import type { RecommendationRecord } from "@/types/entities";
+
+const TONIGHT_OPTIONS = [
+  { label: "30 min", minutes: 30 },
+  { label: "1 hour", minutes: 60 },
+  { label: "90 min", minutes: 90 },
+  { label: "2 hours", minutes: 120 },
+  { label: "3 hours", minutes: 180 },
+  { label: "All night", minutes: 9999 },
+];
+
+function RecommendationCard({
+  rec,
+  onFeedback,
+}: {
+  rec: RecommendationRecord;
+  onFeedback?: (anilistId: number, kind: "like" | "dislike" | "already_seen" | "not_for_me") => void;
+}) {
+  const navigate = useNavigate();
+  const [animeMap, setAnimeMap] = useState<Record<number, AnimeSummary>>({});
+
+  useEffect(() => {
+    void (async () => {
+      const map: Record<number, AnimeSummary> = {};
+      for (const item of rec.items) {
+        const a = await animeCatalogService.getAnime(item.anilistId);
+        if (a) map[item.anilistId] = a;
+      }
+      setAnimeMap(map);
+    })();
+  }, [rec.id]);
+
+  return (
+    <div className="space-y-3">
+      {rec.items.map((item) => {
+        const anime = animeMap[item.anilistId];
+        return (
+          <div key={item.anilistId} className="rounded-xl border border-border bg-card p-3">
+            <button
+              className="flex w-full gap-3 text-left"
+              onClick={() => navigate(`/anime/${item.anilistId}`)}
+            >
+              {anime?.coverImage ? (
+                <img src={anime.coverImage} alt="" className="h-24 w-16 shrink-0 rounded-md object-cover" loading="lazy" />
+              ) : (
+                <div className="h-24 w-16 shrink-0 rounded-md bg-muted" />
+              )}
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="truncate font-medium">
+                  {anime?.title.english ?? anime?.title.romaji ?? `Anime #${item.anilistId}`}
+                </p>
+                <p className="text-xs text-muted-foreground">{item.reason}</p>
+                <div className="flex items-center gap-1">
+                  <AgeBadge guide={anime?.ageGuide} />
+                  {anime?.availability && (
+                    <Badge variant={anime.availability.state === "verified" ? "default" : "outline"} className="text-[10px]">
+                      {anime.availability.state}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </button>
+            {onFeedback && (
+              <div className="mt-2 flex gap-2">
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onFeedback(item.anilistId, "like")}>
+                  <Heart className="mr-1 h-3 w-3" /> Interested
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onFeedback(item.anilistId, "not_for_me")}>
+                  Not for me
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => onFeedback(item.anilistId, "already_seen")}>
+                  Seen
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function HomePage() {
+  const navigate = useNavigate();
+  const [counts, setCounts] = useState({ library: 0, ratings: 0, favorites: 0 });
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [tonightRecs, setTonightRecs] = useState<RecommendationRecord | null>(null);
+  const [hiddenGemRecs, setHiddenGemRecs] = useState<RecommendationRecord | null>(null);
+  const [surpriseRecs, setSurpriseRecs] = useState<RecommendationRecord | null>(null);
+  const [continueWatching, setContinueWatching] = useState<Array<{ anime: AnimeSummary; progress: number }>>([]);
+  const [loadingTonight, setLoadingTonight] = useState(false);
+  const [selectedMinutes, setSelectedMinutes] = useState<number | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      const [library, settings, favs] = await Promise.all([
+        persistence.getLibrary(),
+        persistence.getSettings(),
+        db.favoriteAnime.toArray(),
+      ]);
+      const ratings = await persistence.getTasteSignals();
+      setCounts({
+        library: library.length,
+        ratings: ratings.length,
+        favorites: favs.length,
+      });
+      setOnboardingDone(settings.onboardingCompleted);
+
+      // Load continue watching
+      const watching = library.filter((e) => e.status === "watching");
+      const cw: Array<{ anime: AnimeSummary; progress: number }> = [];
+      for (const entry of watching.slice(0, 5)) {
+        const anime = await animeCatalogService.getAnime(entry.anilistId);
+        if (anime) cw.push({ anime, progress: entry.progress });
+      }
+      setContinueWatching(cw);
+    })();
+  }, []);
+
+  async function loadTonight(minutes: number) {
+    setSelectedMinutes(minutes);
+    setLoadingTonight(true);
+    try {
+      const rec = await recommendationService.recommend({
+        query: minutes < 9999 ? `Something I can finish in about ${minutes} minutes` : "Something binge-worthy",
+        context: "tonight",
+      });
+      setTonightRecs(rec);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingTonight(false);
+    }
+  }
+
+  async function loadHiddenGem() {
+    try {
+      const rec = await recommendationService.recommend({
+        query: "Hidden gem: high quality but not too popular",
+        context: "hidden-gem",
+      });
+      setHiddenGemRecs(rec);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function loadSurprise() {
+    try {
+      const rec = await recommendationService.recommend({
+        query: "Surprise me with something outside my usual taste",
+        context: "surprise",
+      });
+      setSurpriseRecs(rec);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function recordFeedback(
+    anilistId: number,
+    feedback: "like" | "dislike" | "already_seen" | "not_for_me",
+  ) {
+    await recommendationService.recordFeedback(anilistId, feedback);
+  }
+
+  return (
+    <div className="space-y-8">
+      <header className="space-y-1">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Anime Buddy</p>
+        <h1 className="text-2xl font-semibold">Good evening</h1>
+      </header>
+
+      {onboardingDone === false && (
+        <section className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <h2 className="font-medium">Build your taste</h2>
+          <p className="text-sm text-muted-foreground">
+            Rate some anime, pick favorites, or just start talking — no questionnaire.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="secondary">
+              <Link to="/discover">Rate some anime</Link>
+            </Button>
+            <Button asChild size="sm" variant="secondary">
+              <Link to="/buddy">Just start talking</Link>
+            </Button>
+          </div>
+        </section>
+      )}
+
+      {/* Quick actions */}
+      <section className="grid grid-cols-3 gap-3">
+        {[
+          { icon: MessageCircle, label: "Ask Buddy", to: "/buddy" },
+          { icon: Compass, label: "Discover", to: "/discover" },
+          { icon: Sparkles, label: "Surprise Me", action: loadSurprise },
+        ].map((item) => (
+          <Button
+            key={item.label}
+            variant="outline"
+            className="flex h-auto flex-col gap-1 py-3"
+            asChild={!!item.to}
+            onClick={item.action}
+          >
+            {item.to ? (
+              <Link to={item.to}>
+                <item.icon className="h-5 w-5" />
+                <span className="text-xs">{item.label}</span>
+              </Link>
+            ) : (
+              <>
+                <item.icon className="h-5 w-5" />
+                <span className="text-xs">{item.label}</span>
+              </>
+            )}
+          </Button>
+        ))}
+      </section>
+
+      {/* Continue Watching */}
+      {continueWatching.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-medium">Continue Watching</h2>
+            <Button variant="ghost" size="sm" className="h-6 text-xs" asChild>
+              <Link to="/library">View all</Link>
+            </Button>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {continueWatching.map(({ anime, progress }) => (
+              <button
+                key={anime.anilistId}
+                className="flex w-24 shrink-0 flex-col gap-1 text-left"
+                onClick={() => navigate(`/anime/${anime.anilistId}`)}
+              >
+                {anime.coverImage ? (
+                  <img src={anime.coverImage} alt="" className="h-32 w-24 rounded-md object-cover" loading="lazy" />
+                ) : (
+                  <div className="h-32 w-24 rounded-md bg-muted" />
+                )}
+                <span className="text-[10px] text-muted-foreground">Ep {progress}</span>
+                <span className="line-clamp-2 text-xs font-medium">{anime.title.english ?? anime.title.romaji}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Tonight Mode */}
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Moon className="h-4 w-4 text-primary" />
+          <h2 className="font-medium">Tonight</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">How much time do you have?</p>
+        <div className="flex flex-wrap gap-2">
+          {TONIGHT_OPTIONS.map((opt) => (
+            <Button
+              key={opt.label}
+              variant={selectedMinutes === opt.minutes ? "default" : "outline"}
+              size="sm"
+              onClick={() => loadTonight(opt.minutes)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+        {loadingTonight && <p className="text-sm text-muted-foreground">Finding something perfect…</p>}
+        {tonightRecs && (
+          <RecommendationCard rec={tonightRecs} onFeedback={recordFeedback} />
+        )}
+      </section>
+
+      {/* Hidden Gem */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Gem className="h-4 w-4 text-primary" />
+            <h2 className="font-medium">Hidden Gem</h2>
+          </div>
+          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={loadHiddenGem}>
+            {hiddenGemRecs ? "Refresh" : "Find one"}
+          </Button>
+        </div>
+        {hiddenGemRecs ? (
+          <RecommendationCard rec={hiddenGemRecs} onFeedback={recordFeedback} />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Discover great anime that flew under the radar.
+          </p>
+        )}
+      </section>
+
+      {/* Surprise Me */}
+      {surpriseRecs && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h2 className="font-medium">Surprise Me</h2>
+          </div>
+          <RecommendationCard rec={surpriseRecs} onFeedback={recordFeedback} />
+        </section>
+      )}
+
+      {/* Stats */}
+      <section className="grid grid-cols-3 gap-3 text-center">
+        {[
+          { label: "Library", value: counts.library, to: "/library" },
+          { label: "Taste signals", value: counts.ratings },
+          { label: "Favorites", value: counts.favorites, to: "/profile" },
+        ].map((s) => (
+          <Button
+            key={s.label}
+            variant="outline"
+            className="flex h-auto flex-col gap-1 py-3"
+            asChild={!!s.to}
+          >
+            {s.to ? (
+              <Link to={s.to}>
+                <div className="text-xl font-semibold">{s.value}</div>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
+              </Link>
+            ) : (
+              <>
+                <div className="text-xl font-semibold">{s.value}</div>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
+              </>
+            )}
+          </Button>
+        ))}
+      </section>
+    </div>
+  );
+}

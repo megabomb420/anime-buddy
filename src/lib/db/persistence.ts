@@ -1,0 +1,316 @@
+/**
+ * Persistence layer — the ONLY place components/services talk to IndexedDB.
+ *
+ * Components must not call Dexie directly; they go through these
+ * repositories so schema details and validation stay in one place.
+ */
+
+import { db } from "./database";
+import type {
+  AgeGuideRecord,
+  AnimeCacheEntry,
+  AnimeRating,
+  CharacterDNA,
+  CharacterRecord,
+  Conversation,
+  CrunchyrollAvailabilityRecord,
+  ExternalIdMapping,
+  LibraryEntry,
+  LibraryStatus,
+  Message,
+  RecommendationFeedback,
+  RecommendationRecord,
+  SemanticMemory,
+  Settings,
+  TasteProfile,
+  TasteSignal,
+  UserNote,
+  UserProfile,
+} from "@/types/entities";
+
+const now = () => Date.now();
+export const newId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${now()}-${Math.random().toString(36).slice(2)}`;
+
+/** User ratings use 1.0–10.0 with half points. */
+export function assertHalfPointScore(score: number): void {
+  if (!Number.isFinite(score) || score < 1 || score > 10 || (score * 2) % 1 !== 0) {
+    throw new Error(`Invalid score ${score}: must be 1.0–10.0 in 0.5 steps`);
+  }
+}
+
+const DEFAULT_SETTINGS: Settings = {
+  id: "main",
+  region: "IE",
+  contentVisibility: "hide_18_plus",
+  onboardingCompleted: false,
+  updatedAt: 0,
+};
+
+export const persistence = {
+  // ----- profile & settings -----
+
+  async getOrCreateProfile(): Promise<UserProfile> {
+    const existing = await db.userProfiles.get("main");
+    if (existing) return existing;
+    const profile: UserProfile = { id: "main", createdAt: now(), updatedAt: now() };
+    await db.userProfiles.put(profile);
+    return profile;
+  },
+
+  async getSettings(): Promise<Settings> {
+    const existing = await db.settings.get("main");
+    if (existing) return existing;
+    const settings = { ...DEFAULT_SETTINGS, updatedAt: now() };
+    await db.settings.put(settings);
+    return settings;
+  },
+
+  async updateSettings(patch: Partial<Omit<Settings, "id">>): Promise<Settings> {
+    const current = await this.getSettings();
+    const next = { ...current, ...patch, id: "main", updatedAt: now() };
+    await db.settings.put(next);
+    return next;
+  },
+
+  // ----- catalog cache -----
+
+  async cacheAnime(entry: AnimeCacheEntry): Promise<void> {
+    await db.animeCache.put({ ...entry, cachedAt: now() });
+  },
+
+  async getCachedAnime(anilistId: number): Promise<AnimeCacheEntry | undefined> {
+    return db.animeCache.get(anilistId);
+  },
+
+  async searchCachedAnime(text: string, limit = 50): Promise<AnimeCacheEntry[]> {
+    const q = text.trim().toLowerCase();
+    if (!q) return [];
+    return db.animeCache
+      .filter(
+        (a) =>
+          a.title.romaji.toLowerCase().includes(q) ||
+          (a.title.english ?? "").toLowerCase().includes(q),
+      )
+      .limit(limit)
+      .toArray();
+  },
+
+  async saveIdMapping(mapping: ExternalIdMapping): Promise<void> {
+    await db.externalIdMappings.put({ ...mapping, updatedAt: now() });
+  },
+
+  async getIdMapping(anilistId: number): Promise<ExternalIdMapping | undefined> {
+    return db.externalIdMappings.get(anilistId);
+  },
+
+  async saveAvailability(record: CrunchyrollAvailabilityRecord): Promise<void> {
+    await db.crunchyrollAvailability.put(record);
+  },
+
+  async getAvailability(
+    anilistId: number,
+    region: string,
+  ): Promise<CrunchyrollAvailabilityRecord | undefined> {
+    return db.crunchyrollAvailability.get(`${anilistId}:${region}`);
+  },
+
+  async saveAgeGuide(record: AgeGuideRecord): Promise<void> {
+    await db.ageGuides.put({ ...record, updatedAt: now() });
+  },
+
+  async getAgeGuide(anilistId: number, region: string): Promise<AgeGuideRecord | undefined> {
+    return db.ageGuides.get(`${anilistId}:${region}`);
+  },
+
+  // ----- library -----
+
+  async setLibraryStatus(
+    anilistId: number,
+    status: LibraryStatus,
+    progress = 0,
+  ): Promise<LibraryEntry> {
+    const existing = await db.libraryEntries.get(anilistId);
+    const entry: LibraryEntry = {
+      anilistId,
+      status,
+      progress: existing?.progress ?? progress,
+      startedAt:
+        existing?.startedAt ?? (status === "watching" || status === "completed" ? now() : undefined),
+      completedAt: status === "completed" ? now() : existing?.completedAt,
+      updatedAt: now(),
+    };
+    await db.libraryEntries.put(entry);
+    return entry;
+  },
+
+  async getLibrary(status?: LibraryStatus): Promise<LibraryEntry[]> {
+    if (status) return db.libraryEntries.where("status").equals(status).toArray();
+    return db.libraryEntries.toArray();
+  },
+
+  async removeLibraryEntry(anilistId: number): Promise<void> {
+    await db.libraryEntries.delete(anilistId);
+  },
+
+  async setAnimeRating(anilistId: number, score: number): Promise<void> {
+    assertHalfPointScore(score);
+    await db.animeRatings.put({ anilistId, score, updatedAt: now() });
+  },
+
+  async getAnimeRating(anilistId: number): Promise<AnimeRating | undefined> {
+    return db.animeRatings.get(anilistId);
+  },
+
+  async setProgress(anilistId: number, episode: number): Promise<void> {
+    await db.viewingProgress.put({ anilistId, episode, updatedAt: now() });
+    const spoiler = await db.spoilerStates.get(anilistId);
+    if (!spoiler || spoiler.maxEpisodeSeen < episode) {
+      await db.spoilerStates.put({ anilistId, maxEpisodeSeen: episode, updatedAt: now() });
+    }
+  },
+
+  async addFavoriteAnime(anilistId: number, rank?: number): Promise<void> {
+    await db.favoriteAnime.put({ anilistId, rank, addedAt: now() });
+  },
+
+  async removeFavoriteAnime(anilistId: number): Promise<void> {
+    await db.favoriteAnime.delete(anilistId);
+  },
+
+  // ----- characters -----
+
+  async cacheCharacter(character: CharacterRecord): Promise<void> {
+    await db.characters.put({ ...character, cachedAt: now() });
+  },
+
+  async getCharacter(characterId: number): Promise<CharacterRecord | undefined> {
+    return db.characters.get(characterId);
+  },
+
+  async addFavoriteCharacter(characterId: number): Promise<void> {
+    await db.favoriteCharacters.put({ characterId, addedAt: now() });
+  },
+
+  async setCharacterRating(characterId: number, score: number): Promise<void> {
+    assertHalfPointScore(score);
+    await db.characterRatings.put({ characterId, score, updatedAt: now() });
+  },
+
+  // ----- notes & taste -----
+
+  async addNote(input: Omit<UserNote, "id" | "createdAt" | "updatedAt">): Promise<UserNote> {
+    const note: UserNote = { ...input, id: newId(), createdAt: now(), updatedAt: now() };
+    await db.userNotes.put(note);
+    return note;
+  },
+
+  async getNotesFor(subjectType: UserNote["subjectType"], subjectId: number): Promise<UserNote[]> {
+    return db.userNotes
+      .where("subjectId")
+      .equals(subjectId)
+      .filter((n) => n.subjectType === subjectType)
+      .toArray();
+  },
+
+  async addTasteSignal(input: Omit<TasteSignal, "id" | "createdAt">): Promise<TasteSignal> {
+    const signal: TasteSignal = { ...input, id: newId(), createdAt: now() };
+    await db.tasteSignals.put(signal);
+    return signal;
+  },
+
+  async getTasteSignals(): Promise<TasteSignal[]> {
+    return db.tasteSignals.toArray();
+  },
+
+  async getTasteProfile(): Promise<TasteProfile> {
+    const existing = await db.tasteProfiles.get("main");
+    if (existing) return existing;
+    const profile: TasteProfile = { id: "main", stats: {}, version: 1, updatedAt: now() };
+    await db.tasteProfiles.put(profile);
+    return profile;
+  },
+
+  async saveTasteProfile(patch: Partial<Omit<TasteProfile, "id">>): Promise<void> {
+    const current = await this.getTasteProfile();
+    await db.tasteProfiles.put({ ...current, ...patch, id: "main", updatedAt: now() });
+  },
+
+  async getCharacterDNA(): Promise<CharacterDNA> {
+    const existing = await db.characterDNA.get("main");
+    if (existing) return existing;
+    const dna: CharacterDNA = { id: "main", archetypes: {}, updatedAt: now() };
+    await db.characterDNA.put(dna);
+    return dna;
+  },
+
+  async saveCharacterDNA(patch: Partial<Omit<CharacterDNA, "id">>): Promise<void> {
+    const current = await this.getCharacterDNA();
+    await db.characterDNA.put({ ...current, ...patch, id: "main", updatedAt: now() });
+  },
+
+  // ----- memory / conversations / recommendations -----
+
+  async addMemory(input: Omit<SemanticMemory, "id" | "createdAt">): Promise<SemanticMemory> {
+    const memory: SemanticMemory = { ...input, id: newId(), createdAt: now() };
+    await db.semanticMemories.put(memory);
+    return memory;
+  },
+
+  async createConversation(title?: string): Promise<Conversation> {
+    const conversation: Conversation = { id: newId(), title, createdAt: now(), updatedAt: now() };
+    await db.conversations.put(conversation);
+    return conversation;
+  },
+
+  async addMessage(input: Omit<Message, "id" | "createdAt">): Promise<Message> {
+    const message: Message = { ...input, id: newId(), createdAt: now() };
+    await db.messages.put(message);
+    await db.conversations.update(input.conversationId, { updatedAt: now() });
+    return message;
+  },
+
+  async getMessages(conversationId: string): Promise<Message[]> {
+    return db.messages.where("conversationId").equals(conversationId).sortBy("createdAt");
+  },
+
+  async saveRecommendation(
+    input: Omit<RecommendationRecord, "id" | "createdAt">,
+  ): Promise<RecommendationRecord> {
+    const record: RecommendationRecord = { ...input, id: newId(), createdAt: now() };
+    await db.recommendations.put(record);
+    return record;
+  },
+
+  async addRecommendationFeedback(
+    input: Omit<RecommendationFeedback, "id" | "createdAt">,
+  ): Promise<RecommendationFeedback> {
+    const record: RecommendationFeedback = { ...input, id: newId(), createdAt: now() };
+    await db.recommendationFeedback.put(record);
+    return record;
+  },
+
+  // ----- export/import (whole personal dataset) -----
+
+  async exportAll(): Promise<Record<string, unknown[]>> {
+    const dump: Record<string, unknown[]> = {};
+    for (const table of db.tables) {
+      dump[table.name] = await table.toArray();
+    }
+    return dump;
+  },
+
+  async importAll(dump: Record<string, unknown[]>): Promise<void> {
+    await db.transaction("rw", db.tables, async () => {
+      for (const table of db.tables) {
+        const rows = dump[table.name];
+        if (Array.isArray(rows)) {
+          await table.clear();
+          await table.bulkPut(rows as never[]);
+        }
+      }
+    });
+  },
+};

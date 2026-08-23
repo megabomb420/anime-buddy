@@ -1,0 +1,15 @@
+# Copy to wrangler.toml and fill in values. Never commit real secrets —
+# use `wrangler secret put DEEPSEEK_API_KEY` / `wrangler secret put TMDB_API_KEY`
+# for production values.
+
+name = "anime-buddy-worker"
+main = "src/index.ts"
+compatibility_date = "2025-08-01"
+
+[vars]
+# Comma-separated allowed CORS origins for the PWA.
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:7100"
+
+# Set via `wrangler secret put`:
+# DEEPSEEK_API_KEY
+# TMDB_API_KEY
