@@ -56,7 +56,7 @@ export function Poster({
     <Link
       to={`/anime/${anime.anilistId}`}
       className={cn(
-        "group relative block shrink-0 overflow-hidden rounded-lg pressable poster-shadow",
+        "group relative block shrink-0 overflow-hidden rounded-lg pressable poster-shadow poster-lift",
         className,
       )}
       aria-label={title}

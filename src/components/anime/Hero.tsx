@@ -20,18 +20,21 @@ export function FeaturedHero({ anime }: { anime: AnimeSummary }) {
 
   return (
     <section className="relative isolate h-[min(78dvh,640px)] min-h-[460px] overflow-hidden">
-      <div className="absolute inset-0">
-        <PosterImage
-          src={cover || banner}
-          alt=""
-          priority
-          className="h-full w-full object-cover object-top"
-        />
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="hero-art">
+          <PosterImage
+            src={cover || banner}
+            alt=""
+            priority
+            className="h-full w-full object-cover object-top"
+          />
+        </div>
+        <div className="hero-grain absolute inset-0" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/25 to-transparent" />
       </div>
 
       <div className="relative z-10 flex h-full flex-col justify-end px-4 pb-8 pt-16">
-        <div className="max-w-lg space-y-3">
+        <div className="hero-copy max-w-lg space-y-3">
           <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-primary">Featured</p>
           <div>
             <h1 className="text-[2.15rem] leading-[1.05] font-semibold tracking-tight text-balance">

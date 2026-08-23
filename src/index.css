@@ -103,9 +103,94 @@
     background-size: 200% 100%;
     animation: ab-shimmer 1.5s linear infinite;
   }
+
+  .hero-art {
+    position: absolute;
+    inset: -8%;
+    animation: hero-kenburns 36s linear alternate infinite;
+    will-change: transform;
+  }
+
+  .hero-grain {
+    pointer-events: none;
+    opacity: 0.14;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  .hero-copy > * {
+    animation: hero-rise 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .hero-copy > *:nth-child(1) { animation-delay: 40ms; }
+  .hero-copy > *:nth-child(2) { animation-delay: 120ms; }
+  .hero-copy > *:nth-child(3) { animation-delay: 200ms; }
+  .hero-copy > *:nth-child(4) { animation-delay: 280ms; }
+  .hero-copy > *:nth-child(5) { animation-delay: 360ms; }
+
+  .poster-enter {
+    animation: poster-rise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .poster-enter:nth-child(1) { animation-delay: 60ms; }
+  .poster-enter:nth-child(2) { animation-delay: 110ms; }
+  .poster-enter:nth-child(3) { animation-delay: 160ms; }
+  .poster-enter:nth-child(4) { animation-delay: 210ms; }
+  .poster-enter:nth-child(5) { animation-delay: 260ms; }
+  .poster-enter:nth-child(6) { animation-delay: 310ms; }
+  .poster-enter:nth-child(7) { animation-delay: 360ms; }
+  .poster-enter:nth-child(8) { animation-delay: 410ms; }
+
+  .poster-lift {
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .poster-lift:hover {
+    transform: translateY(-4px);
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.08) inset,
+      0 18px 40px rgb(0 0 0 / 0.55);
+  }
 }
 
 @keyframes ab-shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+@keyframes hero-kenburns {
+  from { transform: scale(1) translate3d(0, 0, 0); }
+  to { transform: scale(1.08) translate3d(0, -1.5%, 0); }
+}
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes poster-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-art,
+  .hero-copy > *,
+  .poster-enter {
+    animation: none !important;
+  }
+  .poster-lift:hover {
+    transform: none;
+  }
 }

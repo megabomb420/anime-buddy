@@ -70,7 +70,7 @@ export function PosterRow({
         <Poster
           key={anime.anilistId}
           anime={anime}
-          className={cn(width, "snap-start")}
+          className={cn(width, "snap-start poster-enter")}
           showTitle
           priority={i < 4}
         />
