@@ -73,3 +73,39 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .pressable {
+    transition: transform 150ms ease-out, opacity 150ms ease-out;
+  }
+  .pressable:active {
+    transform: scale(0.98);
+  }
+  .poster-shadow {
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 0.06) inset,
+      0 12px 32px rgb(0 0 0 / 0.45);
+  }
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--secondary)) 0%,
+      hsl(var(--muted-foreground) / 0.25) 50%,
+      hsl(var(--secondary)) 100%
+    );
+    background-size: 200% 100%;
+    animation: ab-shimmer 1.5s linear infinite;
+  }
+}
+
+@keyframes ab-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

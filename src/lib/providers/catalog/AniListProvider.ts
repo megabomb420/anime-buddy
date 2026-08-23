@@ -14,7 +14,7 @@ const ANIME_FIELDS = `
   id
   idMal
   title { romaji english native }
-  coverImage { large }
+  coverImage { extraLarge large }
   bannerImage
   format
   status
@@ -47,7 +47,7 @@ interface AnilistMedia {
   id: number;
   idMal?: number | null;
   title: { romaji: string; english?: string | null; native?: string | null };
-  coverImage?: { large?: string } | null;
+  coverImage?: { extraLarge?: string; large?: string } | null;
   bannerImage?: string | null;
   format?: string | null;
   status?: string | null;
@@ -102,7 +102,7 @@ function toSummary(m: AnilistMedia): AnimeSummary {
       english: m.title.english ?? undefined,
       native: m.title.native ?? undefined,
     },
-    coverImage: m.coverImage?.large ?? undefined,
+    coverImage: m.coverImage?.extraLarge ?? m.coverImage?.large ?? undefined,
     bannerImage: m.bannerImage ?? undefined,
     format: m.format ?? undefined,
     status: m.status ?? undefined,

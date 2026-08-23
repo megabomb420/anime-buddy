@@ -12,6 +12,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AgeBadge } from "@/components/AgeBadge";
+import { FeaturedHero } from "@/components/anime/Hero";
+import { PosterRow, SectionHeader } from "@/components/anime/PosterRow";
+import { HeroSkeleton } from "@/components/anime/Skeletons";
 import { persistence } from "@/lib/db/persistence";
 import { recommendationService } from "@/lib/services/RecommendationService";
 import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
@@ -109,13 +112,17 @@ export default function HomePage() {
   const [continueWatching, setContinueWatching] = useState<Array<{ anime: AnimeSummary; progress: number }>>([]);
   const [loadingTonight, setLoadingTonight] = useState(false);
   const [selectedMinutes, setSelectedMinutes] = useState<number | null>(null);
+  const [hero, setHero] = useState<AnimeSummary | null>(null);
+  const [trending, setTrending] = useState<AnimeSummary[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
 
   useEffect(() => {
     void (async () => {
-      const [library, settings, favs] = await Promise.all([
+      const [library, settings, favs, trend] = await Promise.all([
         persistence.getLibrary(),
         persistence.getSettings(),
         db.favoriteAnime.toArray(),
+        animeCatalogService.getTrending(18).catch(() => [] as AnimeSummary[]),
       ]);
       const ratings = await persistence.getTasteSignals();
       setCounts({
@@ -124,8 +131,10 @@ export default function HomePage() {
         favorites: favs.length,
       });
       setOnboardingDone(settings.onboardingCompleted);
+      setTrending(trend);
+      setHero(trend[0] ?? null);
+      setCatalogLoading(false);
 
-      // Load continue watching
       const watching = library.filter((e) => e.status === "watching");
       const cw: Array<{ anime: AnimeSummary; progress: number }> = [];
       for (const entry of watching.slice(0, 5)) {
@@ -146,7 +155,7 @@ export default function HomePage() {
       });
       setTonightRecs(rec);
     } catch {
-      // ignore
+      /* optional */
     } finally {
       setLoadingTonight(false);
     }
@@ -160,7 +169,7 @@ export default function HomePage() {
       });
       setHiddenGemRecs(rec);
     } catch {
-      // ignore
+      /* optional */
     }
   }
 
@@ -172,7 +181,7 @@ export default function HomePage() {
       });
       setSurpriseRecs(rec);
     } catch {
-      // ignore
+      /* optional */
     }
   }
 
@@ -184,171 +193,169 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-1">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Anime Buddy</p>
-        <h1 className="text-2xl font-semibold">Good evening</h1>
-      </header>
+    <div className="pb-8">
+      {catalogLoading ? <HeroSkeleton /> : hero ? <FeaturedHero anime={hero} /> : null}
 
-      {onboardingDone === false && (
-        <section className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <h2 className="font-medium">Build your taste</h2>
-          <p className="text-sm text-muted-foreground">
-            Rate some anime, pick favorites, or just start talking — no questionnaire.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm" variant="secondary">
-              <Link to="/discover">Rate some anime</Link>
-            </Button>
-            <Button asChild size="sm" variant="secondary">
-              <Link to="/buddy">Just start talking</Link>
-            </Button>
-          </div>
-        </section>
-      )}
-
-      {/* Quick actions */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { icon: Camera, label: "Scan", to: "/scan" },
-          { icon: Compass, label: "Discover", to: "/discover" },
-          { icon: MessageCircle, label: "Ask Buddy", to: "/buddy" },
-          { icon: Sparkles, label: "Surprise Me", action: loadSurprise },
-        ].map((item) => (
-          <Button
-            key={item.label}
-            variant="outline"
-            className="flex h-auto flex-col gap-1 py-3"
-            asChild={!!item.to}
-            onClick={item.action}
-          >
-            {item.to ? (
-              <Link to={item.to}>
-                <item.icon className="h-5 w-5" />
-                <span className="text-xs">{item.label}</span>
-              </Link>
-            ) : (
-              <>
-                <item.icon className="h-5 w-5" />
-                <span className="text-xs">{item.label}</span>
-              </>
-            )}
-          </Button>
-        ))}
+      <section className="mt-8">
+        <SectionHeader title="Trending now" kicker="Live catalog" href="/discover" />
+        <PosterRow
+          items={trending.filter((a) => a.anilistId !== hero?.anilistId)}
+          loading={catalogLoading}
+          size="lg"
+        />
       </section>
 
-      {/* Continue Watching */}
-      {continueWatching.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-medium">Continue Watching</h2>
-            <Button variant="ghost" size="sm" className="h-6 text-xs" asChild>
-              <Link to="/library">View all</Link>
-            </Button>
-          </div>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {continueWatching.map(({ anime, progress }) => (
-              <button
-                key={anime.anilistId}
-                className="flex w-24 shrink-0 flex-col gap-1 text-left"
-                onClick={() => navigate(`/anime/${anime.anilistId}`)}
-              >
-                {anime.coverImage ? (
-                  <img src={anime.coverImage} alt="" className="h-32 w-24 rounded-md object-cover" loading="lazy" />
-                ) : (
-                  <div className="h-32 w-24 rounded-md bg-muted" />
-                )}
-                <span className="text-[10px] text-muted-foreground">Ep {progress}</span>
-                <span className="line-clamp-2 text-xs font-medium">{anime.title.english ?? anime.title.romaji}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+      <div className="mx-auto max-w-md space-y-8 px-4 pt-8">
+        {onboardingDone === false && (
+          <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <h2 className="font-medium">Build your taste</h2>
+            <p className="text-sm text-muted-foreground">
+              Rate some anime, pick favorites, or just start talking — no questionnaire.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="secondary">
+                <Link to="/discover">Rate some anime</Link>
+              </Button>
+              <Button asChild size="sm" variant="secondary">
+                <Link to="/buddy">Just start talking</Link>
+              </Button>
+            </div>
+          </section>
+        )}
 
-      {/* Tonight Mode */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Moon className="h-4 w-4 text-primary" />
-          <h2 className="font-medium">Tonight</h2>
-        </div>
-        <p className="text-sm text-muted-foreground">How much time do you have?</p>
-        <div className="flex flex-wrap gap-2">
-          {TONIGHT_OPTIONS.map((opt) => (
+        <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { icon: Camera, label: "Scan", to: "/scan" },
+            { icon: Compass, label: "Discover", to: "/discover" },
+            { icon: MessageCircle, label: "Ask Buddy", to: "/buddy" },
+            { icon: Sparkles, label: "Surprise Me", action: loadSurprise },
+          ].map((item) => (
             <Button
-              key={opt.label}
-              variant={selectedMinutes === opt.minutes ? "default" : "outline"}
-              size="sm"
-              onClick={() => loadTonight(opt.minutes)}
+              key={item.label}
+              variant="outline"
+              className="flex h-auto flex-col gap-1 py-3"
+              asChild={!!item.to}
+              onClick={item.action}
             >
-              {opt.label}
+              {item.to ? (
+                <Link to={item.to}>
+                  <item.icon className="h-5 w-5" />
+                  <span className="text-xs">{item.label}</span>
+                </Link>
+              ) : (
+                <>
+                  <item.icon className="h-5 w-5" />
+                  <span className="text-xs">{item.label}</span>
+                </>
+              )}
             </Button>
           ))}
-        </div>
-        {loadingTonight && <p className="text-sm text-muted-foreground">Finding something perfect…</p>}
-        {tonightRecs && (
-          <RecommendationCard rec={tonightRecs} onFeedback={recordFeedback} />
-        )}
-      </section>
+        </section>
 
-      {/* Hidden Gem */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Gem className="h-4 w-4 text-primary" />
-            <h2 className="font-medium">Hidden Gem</h2>
-          </div>
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={loadHiddenGem}>
-            {hiddenGemRecs ? "Refresh" : "Find one"}
-          </Button>
-        </div>
-        {hiddenGemRecs ? (
-          <RecommendationCard rec={hiddenGemRecs} onFeedback={recordFeedback} />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Discover great anime that flew under the radar.
-          </p>
+        {continueWatching.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-medium">Continue Watching</h2>
+              <Button variant="ghost" size="sm" className="h-6 text-xs" asChild>
+                <Link to="/library">View all</Link>
+              </Button>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {continueWatching.map(({ anime, progress }) => (
+                <button
+                  key={anime.anilistId}
+                  className="flex w-24 shrink-0 flex-col gap-1 text-left"
+                  onClick={() => navigate(`/anime/${anime.anilistId}`)}
+                >
+                  {anime.coverImage ? (
+                    <img src={anime.coverImage} alt="" className="h-32 w-24 rounded-md object-cover" loading="lazy" />
+                  ) : (
+                    <div className="h-32 w-24 rounded-md bg-muted" />
+                  )}
+                  <span className="text-[10px] text-muted-foreground">Ep {progress}</span>
+                  <span className="line-clamp-2 text-xs font-medium">{anime.title.english ?? anime.title.romaji}</span>
+                </button>
+              ))}
+            </div>
+          </section>
         )}
-      </section>
 
-      {/* Surprise Me */}
-      {surpriseRecs && (
         <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h2 className="font-medium">Surprise Me</h2>
+            <Moon className="h-4 w-4 text-primary" />
+            <h2 className="font-medium">Tonight</h2>
           </div>
-          <RecommendationCard rec={surpriseRecs} onFeedback={recordFeedback} />
+          <p className="text-sm text-muted-foreground">How much time do you have?</p>
+          <div className="flex flex-wrap gap-2">
+            {TONIGHT_OPTIONS.map((opt) => (
+              <Button
+                key={opt.label}
+                variant={selectedMinutes === opt.minutes ? "default" : "outline"}
+                size="sm"
+                onClick={() => loadTonight(opt.minutes)}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+          {loadingTonight && <p className="text-sm text-muted-foreground">Finding something perfect…</p>}
+          {tonightRecs && <RecommendationCard rec={tonightRecs} onFeedback={recordFeedback} />}
         </section>
-      )}
 
-      {/* Stats */}
-      <section className="grid grid-cols-3 gap-3 text-center">
-        {[
-          { label: "Library", value: counts.library, to: "/library" },
-          { label: "Taste signals", value: counts.ratings },
-          { label: "Favorites", value: counts.favorites, to: "/profile" },
-        ].map((s) => (
-          <Button
-            key={s.label}
-            variant="outline"
-            className="flex h-auto flex-col gap-1 py-3"
-            asChild={!!s.to}
-          >
-            {s.to ? (
-              <Link to={s.to}>
-                <div className="text-xl font-semibold">{s.value}</div>
-                <div className="text-xs text-muted-foreground">{s.label}</div>
-              </Link>
-            ) : (
-              <>
-                <div className="text-xl font-semibold">{s.value}</div>
-                <div className="text-xs text-muted-foreground">{s.label}</div>
-              </>
-            )}
-          </Button>
-        ))}
-      </section>
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Gem className="h-4 w-4 text-primary" />
+              <h2 className="font-medium">Hidden Gem</h2>
+            </div>
+            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={loadHiddenGem}>
+              {hiddenGemRecs ? "Refresh" : "Find one"}
+            </Button>
+          </div>
+          {hiddenGemRecs ? (
+            <RecommendationCard rec={hiddenGemRecs} onFeedback={recordFeedback} />
+          ) : (
+            <p className="text-sm text-muted-foreground">Discover great anime that flew under the radar.</p>
+          )}
+        </section>
+
+        {surpriseRecs && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <h2 className="font-medium">Surprise Me</h2>
+            </div>
+            <RecommendationCard rec={surpriseRecs} onFeedback={recordFeedback} />
+          </section>
+        )}
+
+        <section className="grid grid-cols-3 gap-3 text-center">
+          {[
+            { label: "Library", value: counts.library, to: "/library" },
+            { label: "Taste signals", value: counts.ratings },
+            { label: "Favorites", value: counts.favorites, to: "/profile" },
+          ].map((s) => (
+            <Button
+              key={s.label}
+              variant="outline"
+              className="flex h-auto flex-col gap-1 py-3"
+              asChild={!!s.to}
+            >
+              {s.to ? (
+                <Link to={s.to}>
+                  <div className="text-xl font-semibold">{s.value}</div>
+                  <div className="text-xs text-muted-foreground">{s.label}</div>
+                </Link>
+              ) : (
+                <>
+                  <div className="text-xl font-semibold">{s.value}</div>
+                  <div className="text-xs text-muted-foreground">{s.label}</div>
+                </>
+              )}
+            </Button>
+          ))}
+        </section>
+      </div>
     </div>
   );
 }

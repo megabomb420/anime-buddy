@@ -10,23 +10,20 @@ import CharactersPage from "@/pages/CharactersPage";
 import CharacterDetailPage from "@/pages/CharacterDetailPage";
 import ScanPage from "@/pages/ScanPage";
 
-/**
- * App shell — mobile-first, dark-first.
- * Scan is a full-bleed camera destination; other tabs keep the compact column.
- */
 export default function App() {
   const { pathname } = useLocation();
-  const fullBleed = pathname === "/scan";
+  const scan = pathname === "/scan";
+  const edgeToEdge = pathname === "/" || pathname === "/discover";
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
-      {fullBleed ? (
+      {scan ? (
         <Routes>
           <Route path="/scan" element={<ScanPage />} />
         </Routes>
       ) : (
         <>
-          <main className="mx-auto max-w-md px-4 pb-24 pt-6">
+          <main className={edgeToEdge ? "pb-24" : "mx-auto max-w-md px-4 pb-24 pt-6"}>
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/discover" element={<DiscoverPage />} />

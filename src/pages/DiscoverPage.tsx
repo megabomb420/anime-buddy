@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Search, SlidersHorizontal, TrendingUp, Calendar, Heart } from "lucide-react";
-import { AgeBadge } from "@/components/AgeBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
@@ -28,26 +27,19 @@ function getCurrentSeason(): { season: string; year: number } {
   return { season: "FALL", year };
 }
 
-function AnimeCard({ anime, onClick }: { anime: AnimeSummary; onClick: () => void }) {
+function AnimePoster({ anime, onClick }: { anime: AnimeSummary; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex gap-3 rounded-xl border border-border bg-card p-3 text-left">
-      {anime.coverImage ? (
-        <img src={anime.coverImage} alt="" className="h-24 w-16 shrink-0 rounded-md object-cover" loading="lazy" />
-      ) : (
-        <div className="h-24 w-16 shrink-0 rounded-md bg-muted" />
-      )}
-      <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex items-start justify-between gap-2">
-          <p className="truncate font-medium">{anime.title.english ?? anime.title.romaji}</p>
-          <AgeBadge guide={anime.ageGuide} />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {anime.format ?? "Anime"}
-          {anime.seasonYear ? ` · ${anime.seasonYear}` : ""}
-          {anime.anilistScore ? ` · AniList ${anime.anilistScore / 10}` : ""}
-        </p>
-        <p className="line-clamp-2 text-xs text-muted-foreground">{anime.genres.join(" · ")}</p>
+    <button onClick={onClick} className="text-left">
+      <div className="aspect-[2/3] overflow-hidden rounded-lg bg-muted poster-shadow">
+        {anime.coverImage ? (
+          <img src={anime.coverImage} alt="" className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <div className="h-full w-full bg-muted" />
+        )}
       </div>
+      <p className="mt-2 line-clamp-2 text-xs font-medium leading-snug">
+        {anime.title.english ?? anime.title.romaji}
+      </p>
     </button>
   );
 }
@@ -117,7 +109,7 @@ export default function DiscoverPage() {
   const allGenres = Array.from(new Set(results.flatMap((a) => a.genres))).sort();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 px-4 pt-6">
       <h1 className="text-2xl font-semibold">Discover</h1>
 
       <form onSubmit={runSearch} className="relative">
@@ -205,13 +197,15 @@ export default function DiscoverPage() {
       {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <ul className="space-y-3">
+      <div className="grid grid-cols-3 gap-2.5">
         {filteredResults.map((anime) => (
-          <li key={anime.anilistId}>
-            <AnimeCard anime={anime} onClick={() => navigate(`/anime/${anime.anilistId}`)} />
-          </li>
+          <AnimePoster
+            key={anime.anilistId}
+            anime={anime}
+            onClick={() => navigate(`/anime/${anime.anilistId}`)}
+          />
         ))}
-      </ul>
+      </div>
 
       {!loading && filteredResults.length === 0 && !error && (
         <p className="text-sm text-muted-foreground">No results.</p>
