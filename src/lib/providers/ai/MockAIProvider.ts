@@ -1,8 +1,3 @@
-/**
- * Mock AI provider — deterministic, offline, no network. Used for local
- * development and tests so the app works fully without the Worker or keys.
- */
-
 import type {
   AIProvider,
   BuddyContext,
@@ -13,20 +8,17 @@ import type {
   RankedRecommendation,
   TasteAnalysisInput,
 } from "@/types/ai";
+import { mockBuddyReply } from "@/lib/buddy/persona";
 
 export class MockAIProvider implements AIProvider {
   readonly name = "mock";
 
-  async chat(messages: ChatMessage[], _context?: BuddyContext): Promise<string> {
+  async chat(messages: ChatMessage[], context?: BuddyContext): Promise<string> {
     const last = messages[messages.length - 1];
-    return (
-      `I'm Anime Buddy (mock mode — no AI key configured yet). You said: "${last?.content ?? ""}". ` +
-      `Once the Cloudflare Worker is connected with a DeepSeek key, I'll answer with real taste-aware reasoning.`
-    );
+    return mockBuddyReply(last?.content ?? "", context);
   }
 
   async recommend(request: RecommendationRequest): Promise<RankedRecommendation[]> {
-    // Deterministic: rank candidates by AniList score descending, take top 3.
     return request.candidates
       .slice()
       .sort((a, b) => (b.anilistScore ?? 0) - (a.anilistScore ?? 0))
