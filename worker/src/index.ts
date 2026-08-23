@@ -21,10 +21,19 @@
  * wrangler.toml is committed (no secrets). Deploy from this folder.
  */
 
+import {
+  buildSystemPrompt,
+  guardReply,
+  isJailbreakAttempt,
+  lockedReply,
+  sanitizeMessages,
+  type BuddyContext,
+  type ChatMessage,
+} from "./persona";
+
 export interface Env {
   DEEPSEEK_API_KEY?: string;
   TMDB_API_KEY?: string;
-  /** Comma-separated allowed origins for CORS, e.g. "*". */
   ALLOWED_ORIGINS?: string;
 }
 
@@ -33,9 +42,7 @@ const TMDB_URL = "https://api.themoviedb.org/3";
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get("Origin") ?? "";
-  const allowed = (env.ALLOWED_ORIGINS ?? "*")
-    .split(",")
-    .map((o) => o.trim());
+  const allowed = (env.ALLOWED_ORIGINS ?? "*").split(",").map((o) => o.trim());
   const allowOrigin = allowed.includes("*") || allowed.includes(origin) ? origin || "*" : "null";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
@@ -56,7 +63,6 @@ function requireDeepSeekKey(env: Env): string {
   return env.DEEPSEEK_API_KEY;
 }
 
-/** Call DeepSeek chat completions with a system+user message pair. */
 async function deepseekChat(
   env: Env,
   system: string,
@@ -84,12 +90,35 @@ async function deepseekChat(
   return data.choices?.[0]?.message?.content ?? "";
 }
 
+async function deepseekBuddyChat(
+  env: Env,
+  system: string,
+  messages: ChatMessage[],
+): Promise<string> {
+  const res = await fetch(DEEPSEEK_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${requireDeepSeekKey(env)}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      temperature: 0.65,
+      max_tokens: 450,
+      messages: [{ role: "system", content: system }, ...messages],
+    }),
+  });
+  if (!res.ok) throw new Error(`DeepSeek HTTP ${res.status}`);
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content ?? "";
+}
+
 const VISION_SYSTEM =
   "You identify anime figurines, character artwork, manga covers, and merchandise in photographs. " +
-  "Return ONLY JSON: {\"detected\":boolean,\"objectType\":\"figurine\"|\"character_art\"|\"merchandise\"|\"manga\"|\"unknown\"," +
-  "\"characterName\":string|null,\"franchiseTitle\":string|null,\"animeTitle\":string|null,\"confidence\":number," +
-  "\"alternatives\":[{\"characterName\":string|null,\"animeTitle\":string|null,\"confidence\":number}]," +
-  "\"reasoningSummary\":string}. Never invent titles. If uncertain, lower confidence and fill alternatives. " +
+  'Return ONLY JSON: {"detected":boolean,"objectType":"figurine"|"character_art"|"merchandise"|"manga"|"unknown",' +
+  '"characterName":string|null,"franchiseTitle":string|null,"animeTitle":string|null,"confidence":number,' +
+  '"alternatives":[{"characterName":string|null,"animeTitle":string|null,"confidence":number}],' +
+  '"reasoningSummary":string}. Never invent titles. If uncertain, lower confidence and fill alternatives. ' +
   "If not anime-related, detected=false. Do not mention streaming, scores, or age ratings.";
 
 function extractJsonObject(text: string): Record<string, unknown> {
@@ -159,7 +188,6 @@ export default {
     }
 
     try {
-      // --- health ---
       if (url.pathname === "/api/health") {
         return json(
           {
@@ -173,7 +201,6 @@ export default {
         );
       }
 
-      // --- TMDB passthrough ---
       if (url.pathname.startsWith("/api/tmdb/")) {
         if (!env.TMDB_API_KEY) {
           return json({ error: "not_configured" }, { status: 503 }, cors);
@@ -191,7 +218,6 @@ export default {
         });
       }
 
-      // --- AI routes ---
       if (url.pathname.startsWith("/api/ai/") && request.method === "POST") {
         if (!env.DEEPSEEK_API_KEY) {
           return json(
@@ -204,25 +230,22 @@ export default {
 
         switch (url.pathname) {
           case "/api/ai/chat": {
-            const messages = (body.messages ?? []) as Array<{ role: string; content: string }>;
-            const context = (body.context ?? {}) as { tasteSummary?: string };
-            const system =
-              "You are Anime Buddy, a warm, knowledgeable anime friend. You recommend only anime " +
-              "the user can actually watch, respect spoiler limits, and never invent facts about anime. " +
-              (context.tasteSummary ? `User taste profile: ${context.tasteSummary}` : "");
-            const reply = await deepseekChat(
-              env,
-              system,
-              messages.map((m) => `${m.role}: ${m.content}`).join("\n"),
-            );
-            return json({ reply }, { status: 200 }, cors);
+            const messages = sanitizeMessages(body.messages);
+            const context = (body.context ?? {}) as BuddyContext;
+            const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+            if (isJailbreakAttempt(lastUser)) {
+              return json({ reply: lockedReply(lastUser) }, { status: 200 }, cors);
+            }
+            const system = buildSystemPrompt(context);
+            const reply = await deepseekBuddyChat(env, system, messages);
+            return json({ reply: guardReply(reply, lastUser) }, { status: 200 }, cors);
           }
 
           case "/api/ai/recommend": {
             const system =
               "You are the Anime Buddy reranker. Given a small candidate list (JSON) and a user " +
-              "request, pick the best 3. Return ONLY JSON: {\"items\":[{\"anilistId\":number," +
-              "\"reason\":string,\"score\":number}]}. Use only anilistId values from the input. " +
+              'request, pick the best 3. Return ONLY JSON: {"items":[{"anilistId":number,' +
+              '"reason":string,"score":number}]}. Use only anilistId values from the input. ' +
               "Never invent titles or ids.";
             const reply = await deepseekChat(env, system, JSON.stringify(body), true);
             const parsed = JSON.parse(reply) as { items?: unknown[] };
@@ -233,7 +256,7 @@ export default {
             const system =
               "You interpret an anime fan's taste from their ratings, favorites and notes. " +
               "Write a short, warm, specific 'Taste DNA' summary (max 120 words). " +
-              "Return ONLY JSON: {\"summary\": string}.";
+              'Return ONLY JSON: {"summary": string}.';
             const reply = await deepseekChat(env, system, JSON.stringify(body), true);
             const parsed = JSON.parse(reply) as { summary?: string };
             return json({ summary: parsed.summary ?? "" }, { status: 200 }, cors);
@@ -242,8 +265,8 @@ export default {
           case "/api/ai/signals": {
             const system =
               "Extract taste signals from a user's note about anime. Return ONLY JSON: " +
-              "{\"signals\":[{\"kind\":\"genre\"|\"tag\"|\"theme\"|\"character-archetype\"|" +
-              "\"free-text\",\"value\":string,\"weight\":number}]}. Weight is -1..1.";
+              '{"signals":[{"kind":"genre"|"tag"|"theme"|"character-archetype"|' +
+              '"free-text","value":string,"weight":number}]}. Weight is -1..1.';
             const reply = await deepseekChat(env, system, String(body.text ?? ""), true);
             const parsed = JSON.parse(reply) as { signals?: unknown[] };
             return json({ signals: parsed.signals ?? [] }, { status: 200 }, cors);
