@@ -145,17 +145,21 @@ TMDB_API_KEY              # Worker only, availability/certs
 
 ## What was tested
 
-- Typecheck (`tsc --noEmit`)
-- Production build
-- Dev preview: Home, Discover, Scan intro, Library, Buddy, Profile, anime deep link
-- Desktop + mobile smoke
-- Scan file-picker path through compress → gateway (`not_configured` without a key)
-- Persistence: Plan to watch from a catalog title, reload
+- Typecheck (`tsc --noEmit`) — pass
+- Production build — pass
+- Dev + production preview: Home, Discover, Scan intro, Library, Buddy, Profile, Characters, anime detail
+- Desktop (1280×800) and mobile (390×844) smoke: visible catalog content, no console errors, no brand warnings
+- Scan file-picker path: compress → gateway. Without `DEEPSEEK_API_KEY` the result is **Vision isn't configured** (honest, with Try again / Search catalog)
+- Camera permission/unavailable: sandbox has no hardware camera; UI shows **No camera** + photo fallback. Not claimed as device-camera verification.
+- Library: Plan to watch from anime detail persists; All tab shows the title
+- Deep link `/anime/:id` loads AniList metadata (scores labeled AniList/MAL, no fabricated ratings)
 
----
+## GitHub
 
-## GitHub vs preview
+Pushed to `main` (no force-push):
 
-This repository is the **Vite + React Router + vite-plugin-pwa** PWA. Scan talks to the Cloudflare Worker (`POST /api/ai/vision`, model `deepseek-v4-flash-vision-exp`).
+- Repo: https://github.com/megabomb420/anime-buddy
+- Commit: `fc023291fa4e92fd6a016d629b74c774a9ae5ee8`
+- Message: Add Scan: camera figurine recognition via DeepSeek V4 Flash
 
-The Grok App Builder preview is a TanStack Start port of the same product. It uses a server function (`analyzeVisionFn`) when `VITE_WORKER_URL` is empty, still with DeepSeek V4 Flash only — never a substitute vision provider.
+The GitHub repo remains the Vite + React Router PWA. Scan there uses the Cloudflare Worker (`POST /api/ai/vision`). This preview is a TanStack Start port of the same product; vision uses `analyzeVisionFn` when no Worker URL is set. Same model. Same catalog-resolution rule.
