@@ -3,11 +3,65 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b0b10" />
+    <meta name="theme-color" content="#070709" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="description" content="Anime Buddy — your intelligent anime friend for discovering what to watch on Crunchyroll." />
     <title>Anime Buddy</title>
+    <link rel="preload" as="image" href="%BASE_URL%splash.jpg" />
+    <style>
+      html, body { background: #070709; margin: 0; }
+      #boot-splash {
+        position: fixed; inset: 0; z-index: 9999; overflow: hidden; background: #070709;
+      }
+      #boot-splash .art {
+        position: absolute; inset: -8%; width: 116%; height: 116%;
+        object-fit: cover; object-position: center 18%;
+        animation: boot-kb 18s linear alternate infinite;
+      }
+      #boot-splash .veil {
+        position: absolute; inset: 0;
+        background: linear-gradient(to top, #070709 8%, rgba(7,7,9,.2) 48%, rgba(7,7,9,.42) 100%);
+      }
+      #boot-splash .copy {
+        position: absolute; left: 1.25rem; right: 1.25rem; bottom: 4.5rem;
+        color: #f3efe6; font-family: ui-sans-serif, system-ui, sans-serif;
+      }
+      #boot-splash .mark {
+        width: 68px; height: 68px; border-radius: 17px; object-fit: cover;
+        box-shadow: 0 12px 32px rgba(0,0,0,.55);
+      }
+      #boot-splash .kicker {
+        margin: 18px 0 0; font-size: 11px; letter-spacing: .22em;
+        text-transform: uppercase; color: #e24a3b; font-weight: 600;
+      }
+      #boot-splash h1 { margin: 6px 0 0; font-size: 2.15rem; letter-spacing: -.03em; font-weight: 650; }
+      #boot-splash .line { display: block; width: 52px; height: 2px; margin-top: 16px; background: #e24a3b; }
+      #boot-splash.is-out {
+        opacity: 0; filter: blur(10px); transform: scale(1.04);
+        transition: opacity .7s ease, filter .7s ease, transform .7s ease;
+        pointer-events: none;
+      }
+      @keyframes boot-kb {
+        from { transform: scale(1); }
+        to { transform: scale(1.08) translateY(-1.5%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #boot-splash .art { animation: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-splash">
+      <img class="art" src="%BASE_URL%splash.jpg" alt="" />
+      <div class="veil"></div>
+      <div class="copy">
+        <img class="mark" src="%BASE_URL%splash-mark.jpg" alt="" />
+        <p class="kicker">Your watch companion</p>
+        <h1>Anime Buddy</h1>
+        <span class="line"></span>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

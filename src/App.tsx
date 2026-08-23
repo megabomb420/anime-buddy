@@ -1,5 +1,6 @@
 import { Route, Routes, useLocation } from "react-router";
 import { BottomNav } from "@/components/BottomNav";
+import { LaunchSplash } from "@/components/LaunchSplash";
 import BuddyPage from "@/pages/BuddyPage";
 import DiscoverPage from "@/pages/DiscoverPage";
 import HomePage from "@/pages/HomePage";
@@ -17,6 +18,7 @@ export default function App() {
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
+      <LaunchSplash />
       {scan ? (
         <Routes>
           <Route path="/scan" element={<ScanPage />} />
