@@ -1,8 +1,8 @@
 # Anime Buddy — Handover (for the next agent)
 
 **Date:** 2026-08-24  
-**App version:** `0.3.14` (live)  
-**HEAD:** `main` @ 0.3.14 (see `git log -1`)  
+**App version:** `0.3.15` (live)  
+**HEAD:** `main` @ 0.3.15 (see `git log -1`)  
 **Live PWA:** https://megabomb420.github.io/anime-buddy/  
 **Source:** https://github.com/megabomb420/anime-buddy  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev  
@@ -50,7 +50,7 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 
 | Surface | State |
 | --- | --- |
-| Pages | **v0.3.14** — `version.json` must match `package.json` |
+| Pages | **v0.3.15** — `version.json` must match `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live (CLI deploy). Persona includes spoiler lock. |
 | Worker GitHub Action | **Still fails** — `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` empty |
@@ -75,6 +75,7 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.12 | Batch multi-title confirms; library-read from chat; spoiler level (Profile + prompt); Taste DNA Rebuild → Worker `analyzeTaste` |
 | 0.3.13 | Home **For you** row — ratings + library → AniList pool, ranked in `src/lib/taste-rank.ts` |
 | 0.3.14 | **For you** polish — reason under each poster, Refresh cycles next-best titles, Interested / Not for me tap feedback via `recordFeedback` (`forYou()` returns `reasons`, takes `excludeIds`) |
+| 0.3.15 | **Tonight** no longer Crunchyroll-first (`requireCrunchyroll: false`, same as Ren recs) → picks always render; Featured hero rotates every **20s** |
 
 Worker tools + SSE health went live via CLI (not CI).
 
@@ -130,10 +131,9 @@ If you lack Cloudflare credentials: say so. Do not pretend it deployed. CI Worke
 1. **`persistence.ts` object-literal commas.** Missing `,` after a method → Pages `tsc -b` fails (`TS1005`). Happened on 0.3.12 (`59d05a4`); fixed in `f4fbb28`.
 2. **Stale PWA.** Users think nothing shipped. Check Home footer vs `version.json`.
 3. **Spy×Family.** `normalizeTitleKey` must turn `×` into ` x `, not `x`.
-4. **Tonight recs** still `requireCrunchyroll` default **true** → pool often empty. For-you and Ren recs skip that.
-5. **For you** is empty until the user rates or logs library titles. By design.
-6. **Client vs Worker persona.** Spoiler block exists in both. Change both or chat/Worker drift.
-7. **Do not put keys in** `VITE_*`, `.env`, or `wrangler.toml` `[vars]`.
+4. **For you** is empty until the user rates or logs library titles. By design.
+5. **Client vs Worker persona.** Spoiler block exists in both. Change both or chat/Worker drift.
+6. **Do not put keys in** `VITE_*`, `.env`, or `wrangler.toml` `[vars]`.
 
 ---
 
@@ -141,11 +141,10 @@ If you lack Cloudflare credentials: say so. Do not pretend it deployed. CI Worke
 
 Suggested order, small PRs:
 
-1. **Tonight without Crunchyroll-first** — same as Ren recs, or fallback already in service but Home still waits on empty verified pool.
-2. **Session summary every N turns** (roadmap #9) — token save; still no invented catalog facts.
-3. **Compare two catalog titles** (roadmap #10) — AniList ids only, side by side cards.
-4. **Worker CI secrets** — tell the user to add `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; do not invent a deploy.
-5. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
+1. **Session summary every N turns** (roadmap #9) — token save; still no invented catalog facts.
+2. **Compare two catalog titles** (roadmap #10) — AniList ids only, side by side cards.
+3. **Worker CI secrets** — tell the user to add `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; do not invent a deploy.
+4. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
 
 Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 

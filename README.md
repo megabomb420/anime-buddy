@@ -14,7 +14,7 @@ UI chrome is **English**. Ren still answers Polish in Polish.
 
 | Screen | What you get |
 | --- | --- |
-| **Home** | Featured hero (rotates every 45s, dots to jump), trending, **For you** (scored from ratings + library + AniList recs — reason under each poster, Refresh for new picks, Interested / Not for me feedback), tonight picks. **App version + Update** at the bottom. |
+| **Home** | Featured hero (rotates every 20s, dots to jump), trending, **For you** (scored from ratings + library + AniList recs — reason under each poster, Refresh for new picks, Interested / Not for me feedback), tonight picks. **App version + Update** at the bottom. |
 | **Discover** | Live search from 2 letters (covers). Trending / Seasonal / Popular. iOS safe-area header. |
 | **Scan** | Camera or photo of a figurine / character art → AniList match |
 | **Library** | Watching, want to watch, completed. Same safe-area as Discover. |

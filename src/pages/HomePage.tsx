@@ -34,7 +34,7 @@ const TONIGHT_OPTIONS = [
 ];
 
 /** How often Featured cycles through the trending pool. */
-const FEATURED_ROTATE_MS = 45_000;
+const FEATURED_ROTATE_MS = 20_000;
 const FEATURED_POOL_SIZE = 8;
 
 function RecommendationCard({
@@ -253,6 +253,7 @@ export default function HomePage() {
       const rec = await recommendationService.recommend({
         query: minutes < 9999 ? `Something I can finish in about ${minutes} minutes` : "Something binge-worthy",
         context: "tonight",
+        requireCrunchyroll: false,
       });
       setTonightRecs(rec);
     } catch {
