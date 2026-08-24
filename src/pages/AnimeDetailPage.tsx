@@ -246,12 +246,14 @@ export default function AnimeDetailPage() {
       {/* Banner + Cover */}
       <div className="relative">
         {anime.bannerImage ? (
-          <img
-            src={anime.bannerImage}
-            alt=""
-            className="h-40 w-full rounded-xl object-cover"
-            loading="lazy"
-          />
+          <div className="h-40 w-full overflow-hidden rounded-xl">
+            <img
+              src={anime.bannerImage}
+              alt=""
+              className="detail-banner-art h-full w-full object-cover"
+              loading="lazy"
+            />
+          </div>
         ) : (
           <div className="h-40 w-full rounded-xl bg-muted" />
         )}

@@ -1,7 +1,7 @@
 {
   "name": "anime-buddy",
   "private": true,
-  "version": "0.3.19",
+  "version": "0.3.20",
   "type": "module",
   "homepage": "https://megabomb420.github.io/anime-buddy/",
   "scripts": {

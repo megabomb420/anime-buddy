@@ -116,6 +116,12 @@
     will-change: transform;
   }
 
+  .detail-banner-art {
+    /* Same slow zoom-in as Featured, one-shot on page open. */
+    animation: hero-kenburns 14s ease-out forwards;
+    will-change: transform;
+  }
+
   .hero-grain {
     pointer-events: none;
     opacity: 0.14;
@@ -230,6 +236,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hero-art,
+  .detail-banner-art,
   .hero-copy > *,
   .poster-enter,
   .buddy-empty > *,
