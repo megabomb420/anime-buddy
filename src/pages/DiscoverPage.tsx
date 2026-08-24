@@ -241,7 +241,7 @@ export default function DiscoverPage() {
   const showSuggest = suggestOpen && query.trim().length >= LIVE_MIN && suggestions.length > 0;
 
   return (
-    <div className="space-y-4 px-4 pt-6">
+    <div className="space-y-4 px-4 pt-[max(1.5rem,calc(env(safe-area-inset-top)+0.5rem))]">
       <h1 className="text-2xl font-semibold">Discover</h1>
 
       <form ref={boxRef} onSubmit={onSubmit} className="relative">

@@ -26,7 +26,11 @@ export default function App() {
         <>
           <main
             className={
-              buddy ? "" : edgeToEdge ? "pb-24" : "mx-auto max-w-md px-4 pb-24 pt-6"
+              buddy
+                ? ""
+                : edgeToEdge
+                  ? "pb-[calc(6rem+env(safe-area-inset-bottom))]"
+                  : "mx-auto max-w-md px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-[max(1.5rem,calc(env(safe-area-inset-top)+0.5rem))]"
             }
           >
             <Routes>

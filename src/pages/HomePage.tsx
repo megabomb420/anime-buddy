@@ -15,6 +15,7 @@ import { AgeBadge } from "@/components/AgeBadge";
 import { FeaturedHero } from "@/components/anime/Hero";
 import { PosterRow, SectionHeader } from "@/components/anime/PosterRow";
 import { HeroSkeleton } from "@/components/anime/Skeletons";
+import { AppVersionFooter } from "@/components/AppVersionFooter";
 import { persistence } from "@/lib/db/persistence";
 import { recommendationService } from "@/lib/services/RecommendationService";
 import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
@@ -406,6 +407,7 @@ export default function HomePage() {
             </Button>
           ))}
         </section>
+        <AppVersionFooter />
       </div>
     </div>
   );

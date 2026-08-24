@@ -1,7 +1,7 @@
 # Anime Buddy — Handover
 
 **Date:** 2026-08-24  
-**App version:** `0.3.5` (see Profile → App version + `version.json` on Pages)  
+**App version:** `0.3.6` (Home footer + `version.json` on Pages)  
 **Owner repo:** [megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy) (public)  
 **Live app:** [https://megabomb420.github.io/anime-buddy/](https://megabomb420.github.io/anime-buddy/)
 
@@ -42,11 +42,12 @@ Worker is **baked in** for Scan + Buddy. Profile can override; reset returns to 
 
 ## Versioning
 
-- `package.json` → semver shown in UI (`0.3.5`+)
+- `package.json` → semver shown in UI (`0.3.6`+)
 - CI injects `VITE_APP_VERSION`, `VITE_GIT_SHA` (7 chars), `VITE_BUILD_TIME`
 - Each Pages deploy writes `dist/version.json` `{ version, commit, builtAt }`
-- **Profile → App version** compares this install to `version.json` (no-store fetch)
-  - *You have the latest build* vs *Newer build online* + Reload
+- **Home footer** compares this install to `version.json` (no-store fetch)
+  - *You're on the latest build* vs *Update available* + Update
+- Profile still shows the same block; Home is the one you actually see.
 
 Bump `package.json` version when shipping a meaningful user-facing change.
 
@@ -129,7 +130,7 @@ No owner bypass. Lock stays on.
 | Chat | `POST /api/ai/chat` |
 | PWA | `vite-plugin-pwa`; SPA `404.html` |
 | Launch | No splash |
-| Version | Profile + `version.json` |
+| Version | Home footer + `version.json` |
 
 Secrets only in Cloudflare Worker: `DEEPSEEK_API_KEY` (required), `TMDB_API_KEY` (optional).
 
@@ -141,12 +142,12 @@ Never put secrets in `VITE_*`, committed `.env`, or `wrangler.toml`.
 
 | Path | Screen |
 | --- | --- |
-| `/` | Home (featured + trending) |
-| `/discover` | Discover |
+| `/` | Home (featured + trending + version footer) |
+| `/discover` | Discover (safe-area header) |
 | `/scan` | Camera / figurine recognition |
-| `/library` | Library |
+| `/library` | Library (safe-area header) |
 | `/buddy` | Ren chat (+ library confirm) |
-| `/profile` | Taste, Worker, **App version**, export |
+| `/profile` | Taste, Worker, export |
 
 ---
 
@@ -178,7 +179,8 @@ Persona / vision changes need a **Worker** redeploy, not only Pages.
 - [x] Ren persona + jailbreak / off-lane locks
 - [x] Featured rotate 45s; no splash
 - [x] Library confirm flow via Ren + spam detector
-- [x] App version + latest check on Profile
+- [x] App version + latest check on **Home footer** (Profile still has it)
+- [x] iOS safe-area: Discover / Library / padded screens no longer sit under the status bar
 - [x] Buddy full-height chat (empty state fills the screen; composer above tab bar)
 - [x] Buddy types replies one character at a time (caret + dots). Worker source has DeepSeek thinking on (`deepseek-v4-flash`); live Worker is still JSON until Cloudflare secrets exist.
 - [x] README + this handover
@@ -188,7 +190,7 @@ Persona / vision changes need a **Worker** redeploy, not only Pages.
 ## Verify after deploy
 
 1. Hard-refresh the live app (clear PWA cache if stuck).
-2. Profile → **App version** shows `v0.3.5` (or current) and *latest* or *update*.
+2. Home bottom shows `v0.3.6` (or current). If a newer build is online, **Update**.
 3. `curl -s https://megabomb420.github.io/anime-buddy/version.json`
 4. Buddy empty screen: prompt cards fill the view; composer sits on the tab bar (no black void).
 5. Buddy: `oglądałem Naruto` → confirm card → appears in Library.
