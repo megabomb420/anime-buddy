@@ -183,10 +183,10 @@ export default function BuddyPage() {
     if (reason && status === "dropped") {
       try {
         await persistence.addTasteSignal({
-          kind: "note",
+          kind: "free-text",
           value: reason.slice(0, 120).toLowerCase(),
           weight: -0.4,
-          source: "buddy-drop",
+          source: "conversation",
           subjectId: pick.anilistId,
         });
       } catch {
