@@ -53,10 +53,10 @@ export default function BuddyPage() {
     <div className="flex min-h-[70vh] flex-col space-y-4">
       <header className="flex items-center gap-3">
         <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-          B
+          R
         </span>
         <div>
-          <h1 className="text-2xl font-semibold leading-none">Buddy</h1>
+          <h1 className="text-2xl font-semibold leading-none">Ren</h1>
           <p className="mt-1 text-xs text-muted-foreground">
             {live ? "DeepSeek · live" : "Local until the Worker is connected"}
           </p>
