@@ -26,6 +26,7 @@ import { providers } from "@/lib/providers";
 import {
   buildTasteWeights,
   pickForYou,
+  reasonForYou,
   topGenres,
   type SeedBoost,
   type TasteAnchor,
@@ -38,7 +39,14 @@ import { animeCatalogService } from "./AnimeCatalogService";
 export interface ForYouResult {
   items: AnimeSummary[];
   kicker: string;
+  /** Per-item human reason, keyed by AniList id. From AniList data only. */
+  reasons: Record<number, string>;
   empty?: "no-taste" | "no-matches";
+}
+
+export interface ForYouOptions {
+  /** Extra ids to keep out of the row (Refresh / "not for me"). */
+  excludeIds?: Set<number>;
 }
 
 export interface RecommendOptions {
@@ -251,7 +259,7 @@ export class RecommendationService {
    * Home "For you" row. Seeds from ratings / library, candidates from AniList
    * (recommendations + genre lists + trending). No invented titles.
    */
-  async forYou(limit = 12): Promise<ForYouResult> {
+  async forYou(limit = 12, opts?: ForYouOptions): Promise<ForYouResult> {
     const [library, ratings, favorites, settings] = await Promise.all([
       persistence.getLibrary(),
       persistence.getAnimeRatings(),
@@ -262,6 +270,7 @@ export class RecommendationService {
     const ratingMap = new Map(ratings.map((r) => [r.anilistId, r.score]));
     const favSet = new Set(favorites.map((f) => f.anilistId));
     const exclude = new Set(library.map((e) => e.anilistId));
+    for (const id of opts?.excludeIds ?? []) exclude.add(id);
 
     const anchors: TasteAnchor[] = [];
     const seenAnchor = new Set<number>();
@@ -292,7 +301,7 @@ export class RecommendationService {
       (a) => a.rating != null || a.status === "completed" || a.status === "watching" || a.favorite,
     );
     if (!hasTaste) {
-      return { items: [], kicker: "From your library", empty: "no-taste" };
+      return { items: [], kicker: "From your library", reasons: {}, empty: "no-taste" };
     }
 
     const weights = buildTasteWeights(anchors);
@@ -356,11 +365,16 @@ export class RecommendationService {
 
     const items = pickForYou(filtered, { weights, exclude, seedBoost }, limit);
     if (!items.length) {
-      return { items: [], kicker: "From your ratings", empty: "no-matches" };
+      return { items: [], kicker: "From your ratings", reasons: {}, empty: "no-matches" };
+    }
+
+    const reasons: Record<number, string> = {};
+    for (const anime of items) {
+      reasons[anime.anilistId] = reasonForYou(anime, { weights, seedBoost });
     }
 
     const kicker = seeds[0]?.title ? `Because you liked ${seeds[0].title}` : "From your ratings";
-    return { items, kicker };
+    return { items, kicker, reasons };
   }
 
   /** Record feedback on a recommendation — feeds back into taste signals. */

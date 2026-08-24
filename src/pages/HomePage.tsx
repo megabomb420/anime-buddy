@@ -8,6 +8,7 @@ import {
   Sparkles,
   Moon,
   Heart,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -121,9 +122,11 @@ export default function HomePage() {
   const [heroIndex, setHeroIndex] = useState(0);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [forYou, setForYou] = useState<AnimeSummary[]>([]);
+  const [forYouReasons, setForYouReasons] = useState<Record<number, string>>({});
   const [forYouKicker, setForYouKicker] = useState("From your library");
   const [forYouEmpty, setForYouEmpty] = useState<"no-taste" | "no-matches" | null>(null);
   const [forYouLoading, setForYouLoading] = useState(true);
+  const forYouExcludedRef = useRef<Set<number>>(new Set());
   const poolLenRef = useRef(0);
 
   const featuredPool = useMemo(
@@ -165,20 +168,46 @@ export default function HomePage() {
     })();
   }, []);
 
+  async function loadForYou(excludeIds?: Set<number>) {
+    setForYouLoading(true);
+    try {
+      const result = await recommendationService.forYou(12, excludeIds ? { excludeIds } : undefined);
+      setForYou(result.items);
+      setForYouReasons(result.reasons);
+      setForYouKicker(result.kicker);
+      setForYouEmpty(result.empty ?? null);
+      return result;
+    } catch {
+      setForYouEmpty("no-matches");
+      return null;
+    } finally {
+      setForYouLoading(false);
+    }
+  }
+
   useEffect(() => {
-    void (async () => {
-      try {
-        const result = await recommendationService.forYou(12);
-        setForYou(result.items);
-        setForYouKicker(result.kicker);
-        setForYouEmpty(result.empty ?? null);
-      } catch {
-        setForYouEmpty("no-matches");
-      } finally {
-        setForYouLoading(false);
-      }
-    })();
+    void loadForYou();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** Refresh: cycle to the next-best titles; wrap around when the pool runs out. */
+  async function refreshForYou() {
+    const excluded = forYouExcludedRef.current;
+    for (const a of forYou) excluded.add(a.anilistId);
+    const result = await loadForYou(excluded);
+    if (result && result.items.length === 0 && excluded.size > 0) {
+      excluded.clear();
+      await loadForYou();
+    }
+  }
+
+  async function forYouFeedback(anilistId: number, kind: "like" | "not_for_me") {
+    await recommendationService.recordFeedback(anilistId, kind);
+    if (kind === "not_for_me") {
+      forYouExcludedRef.current.add(anilistId);
+      setForYou((items) => items.filter((a) => a.anilistId !== anilistId));
+    }
+  }
 
   useEffect(() => {
     if (featuredPool.length < 2) return;
@@ -288,9 +317,32 @@ export default function HomePage() {
       </section>
 
       <section className="mt-8">
-        <SectionHeader title="For you" kicker={forYouKicker} href="/discover" />
+        <SectionHeader
+          title="For you"
+          kicker={forYouKicker}
+          href="/discover"
+          action={
+            forYou.length > 0 ? (
+              <button
+                type="button"
+                aria-label="Refresh For you"
+                onClick={() => void refreshForYou()}
+                disabled={forYouLoading}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+              >
+                <RefreshCw className={forYouLoading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+              </button>
+            ) : undefined
+          }
+        />
         {forYouLoading || forYou.length > 0 ? (
-          <PosterRow items={forYou} loading={forYouLoading} size="lg" />
+          <PosterRow
+            items={forYou}
+            loading={forYouLoading}
+            size="lg"
+            reasons={forYouReasons}
+            onFeedback={(id, kind) => void forYouFeedback(id, kind)}
+          />
         ) : (
           <p className="px-4 text-sm text-muted-foreground">
             {forYouEmpty === "no-taste"
