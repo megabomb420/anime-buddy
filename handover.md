@@ -7,6 +7,8 @@
 
 Read this before changing the product. `handoff.md` (if present) points here.
 
+**Docs rule:** every user-facing change updates **this file and [README.md](./README.md)** in the same commit.
+
 ---
 
 ## Product
@@ -183,7 +185,7 @@ Persona / vision changes need a **Worker** redeploy, not only Pages.
 - [x] iOS safe-area: Discover / Library / padded screens no longer sit under the status bar
 - [x] Buddy full-height chat (empty state fills the screen; composer above tab bar)
 - [x] Buddy types replies one character at a time (caret + dots). Worker source has DeepSeek thinking on (`deepseek-v4-flash`); live Worker is still JSON until Cloudflare secrets exist.
-- [x] README + this handover
+- [x] README + this handover (kept in the same commit)
 
 ---
 

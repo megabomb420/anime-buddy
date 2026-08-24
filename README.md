@@ -1,53 +1,58 @@
 # Anime Buddy
 
-**Live app:** [https://megabomb420.github.io/anime-buddy/](https://megabomb420.github.io/anime-buddy/)
+**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.6**
 
-**Source:** [https://github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
+**Source:** [github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
 
-**Live Worker (Scan + Buddy):** [https://anime-buddy-worker.whip-blanket.workers.dev](https://anime-buddy-worker.whip-blanket.workers.dev)
+**Worker (Scan + Buddy):** [anime-buddy-worker.whip-blanket.workers.dev](https://anime-buddy-worker.whip-blanket.workers.dev)
 
-Local-first anime companion. Discover titles, keep a library, scan figurines with the camera, and talk to **Buddy** — a locked-in anime friend who will not drop character.
+Local-first, mobile-first PWA. Discover anime, keep a library, scan figurines, talk to **Ren** (tab name: **Buddy**). Lists and taste stay on the device (IndexedDB). No accounts. No cloud library.
 
-Your lists and taste stay on the device (IndexedDB). No accounts. No cloud library.
+UI chrome is **English**. Ren still answers Polish in Polish.
 
-## What it does
+## Screens
 
 | Screen | What you get |
 | --- | --- |
-| Home / Discover | AniList catalog, search, trending |
-| Scan | Camera or photo of a figurine / character art, matched to AniList |
-| Library | Watching, plan to watch, completed |
-| Buddy | Chat for recs. Same DeepSeek Worker as Scan. He stays Buddy. |
-| Profile | Taste, age gate, Worker status (override only if you move it) |
+| **Home** | Featured hero (rotates), trending, tonight picks. **App version + Update** at the bottom. |
+| **Discover** | Live search from 2 letters (covers). Trending / Seasonal / Popular. iOS safe-area header. |
+| **Scan** | Camera or photo of a figurine / character art → AniList match |
+| **Library** | Watching, want to watch, completed. Same safe-area as Discover. |
+| **Buddy** | Full-height chat with Ren. Recs come as tappable cover cards. `I finished Attack on Titan…` → confirm card → Library. Replies type out. |
+| **Profile** | Taste, age gate, Worker override, data export. Version also lives here, but Home is the one you see. |
 
-Catalog metadata is canonical from **AniList**. Scores/ratings may also show Jikan (MAL). AI never invents titles, scores, or streaming facts.
+Catalog is **AniList**. Scores may also show Jikan (MAL). AI never invents titles, scores, or streaming facts.
 
-## Live AI (Scan + Buddy)
+## Buddy (Ren)
 
-Scan identification and Buddy chat are **already wired** to:
+Night-owl anime companion. Short, dry. Anime lane only — math, code, homework get a deflection, not an answer. Lock is on the **client and the Worker**. No bypass code.
 
-`https://anime-buddy-worker.whip-blanket.workers.dev`
+## Live AI
 
-The DeepSeek key stays a Cloudflare Worker secret — never in this repo, never `VITE_`. You do not paste a Worker URL to use Scan or Buddy.
+Scan and Buddy are already pointed at the Cloudflare Worker. The DeepSeek key is a Worker secret — never in this repo, never `VITE_`.
 
-To run your own Worker instead: deploy [`worker/`](./worker), add secret `DEEPSEEK_API_KEY`, then override the address in **Profile → Scan + Buddy**.
+To run your own Worker: deploy [`worker/`](./worker), add `DEEPSEEK_API_KEY`, then override the address in **Profile → Scan + Buddy**.
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/megabomb420/anime-buddy/tree/main/worker)
 
-## Run it yourself
+## Run it
 
 ```bash
 npm install
 npm run dev
 ```
 
-Build for GitHub Pages:
+GitHub Pages build:
 
 ```bash
 GITHUB_PAGES=true npm run build
 ```
 
+Push to `main` publishes the PWA. Worker is a **separate** deploy (`cd worker && npx wrangler deploy`).
+
 ## Docs
 
-- [handover.md](./handover.md) — architecture, persona lock, deploy, what to do next
+- **[handover.md](./handover.md)** — architecture, persona lock, versioning, deploy, what to verify. Read this before changing the product.
 - [worker/README.md](./worker/README.md) — Worker dashboard setup
+
+Keep **README + handover** in the same commit when behavior changes.
