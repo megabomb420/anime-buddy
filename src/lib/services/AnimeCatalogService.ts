@@ -52,16 +52,25 @@ export class AnimeCatalogService {
     if (hit && Date.now() - hit.at < SEARCH_TTL_MS) return hit.items;
 
     const variants = searchQueryVariants(query);
-    const batches = await Promise.all(
-      variants.slice(0, 4).map((v) =>
-        providers.catalog.searchAnime(v, Math.max(limit, 12)).catch(() => [] as AnimeSummary[]),
-      ),
-    );
-    let merged = uniqueById(batches.flat());
+    // Sequential — parallel AniList bursts often 429 and return empty.
+    const collected: AnimeSummary[] = [];
+    for (const v of variants.slice(0, 5)) {
+      try {
+        const batch = await providers.catalog.searchAnime(v, Math.max(limit, 12));
+        collected.push(...batch);
+        // Early exit when we already have a strong title hit.
+        const ranked = rankByTitleMatch(query, uniqueById(collected));
+        if (ranked.some((a) => scoreTitleMatch(query, a) >= 80)) break;
+      } catch {
+        /* try next variant */
+      }
+    }
+
+    let merged = uniqueById(collected);
     merged = rankByTitleMatch(query, merged);
 
-    // Prefer real matches; if AniList returned noise, still keep ranked list.
-    const strong = merged.filter((a) => scoreTitleMatch(query, a) >= 50);
+    // Soft threshold — SPY×FAMILY vs "spy x family" must stay in.
+    const strong = merged.filter((a) => scoreTitleMatch(query, a) >= 35);
     const results = (strong.length > 0 ? strong : merged).slice(0, limit);
 
     searchMemo.set(key, { at: Date.now(), items: results });
