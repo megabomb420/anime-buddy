@@ -19,7 +19,9 @@ import { BUDDY_CHIPS, interpretBuddyQuery, wantsRecommendation } from "@/lib/bud
 import {
   libraryDoneReply,
   libraryPromptReply,
-  parseLibraryIntent,
+  parseBuddyWriteIntent,
+  rateDoneReply,
+  ratePromptReply,
 } from "@/lib/buddy-library";
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { animeTitle } from "@/lib/media";
@@ -30,6 +32,7 @@ import { memoryService } from "@/lib/services/MemoryService";
 import { streamAsBuddy } from "@/lib/services/BuddyChatService";
 import { recommendationService } from "@/lib/services/RecommendationService";
 import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
+import { tasteService } from "@/lib/services/TasteService";
 import { getWorkerUrl } from "@/lib/worker-gateway";
 import { cn } from "@/lib/utils";
 import type { Conversation, LibraryStatus } from "@/types/entities";
@@ -42,6 +45,12 @@ interface UiMessage {
   picks?: RecPick[];
   libraryConfirm?: {
     status: LibraryStatus;
+    picks: RecPick[];
+    progress?: number;
+    reason?: string;
+  };
+  rateConfirm?: {
+    score: number;
     picks: RecPick[];
   };
 }
@@ -58,6 +67,8 @@ const CHIP_ICONS: Record<string, LucideIcon> = {
 const LOG_PREFIXES = [
   { label: "I finished…", prefix: "I finished " },
   { label: "I'm watching…", prefix: "I'm watching " },
+  { label: "Episode…", prefix: "episode " },
+  { label: "Rate…", prefix: "rate " },
 ];
 
 async function catalogPicksFor(text: string): Promise<RecPick[]> {
@@ -152,7 +163,13 @@ export default function BuddyPage() {
     });
   }
 
-  async function confirmLibrary(status: LibraryStatus, pick: RecPick, polish: boolean) {
+  async function confirmLibrary(
+    status: LibraryStatus,
+    pick: RecPick,
+    polish: boolean,
+    progress?: number,
+    reason?: string,
+  ) {
     const spam = checkConfirmSpam();
     if (!spam.ok && spam.reason) {
       const reply = spamReply(spam.reason, polish);
@@ -162,9 +179,44 @@ export default function BuddyPage() {
       return;
     }
 
-    await persistence.setLibraryStatus(pick.anilistId, status);
+    await persistence.setLibraryStatus(pick.anilistId, status, progress ?? 0);
+    if (reason && status === "dropped") {
+      try {
+        await persistence.addTasteSignal({
+          kind: "note",
+          value: reason.slice(0, 120).toLowerCase(),
+          weight: -0.4,
+          source: "buddy-drop",
+          subjectId: pick.anilistId,
+        });
+      } catch {
+        /* optional */
+      }
+    }
     const convo = await ensureConvo();
-    const reply = libraryDoneReply(animeTitle(pick), status, polish);
+    const reply = libraryDoneReply(animeTitle(pick), status, polish, progress);
+    await memoryService.appendMessage(convo.id, "assistant", reply);
+    await revealAssistant({ role: "assistant", content: "", polish }, reply);
+  }
+
+  async function confirmRating(score: number, pick: RecPick, polish: boolean) {
+    const spam = checkConfirmSpam();
+    if (!spam.ok && spam.reason) {
+      const reply = spamReply(spam.reason, polish);
+      const convo = await ensureConvo();
+      await memoryService.appendMessage(convo.id, "assistant", reply);
+      await revealAssistant({ role: "assistant", content: "", polish }, reply);
+      return;
+    }
+
+    await persistence.setAnimeRating(pick.anilistId, score);
+    try {
+      await tasteService.learnFromRating(pick.anilistId, score);
+    } catch {
+      /* optional */
+    }
+    const convo = await ensureConvo();
+    const reply = rateDoneReply(animeTitle(pick), score, polish);
     await memoryService.appendMessage(convo.id, "assistant", reply);
     await revealAssistant({ role: "assistant", content: "", polish }, reply);
   }
@@ -198,6 +250,7 @@ export default function BuddyPage() {
         streaming: false,
         picks: base.picks,
         libraryConfirm: base.libraryConfirm,
+        rateConfirm: base.rateConfirm,
       });
     }
   }
@@ -230,10 +283,10 @@ export default function BuddyPage() {
       const next: UiMessage[] = [...messagesRef.current, { role: "user", content: text, polish }];
       setMessages(next);
 
-      const libIntent = parseLibraryIntent(text);
-      if (libIntent) {
-        const candidates = await libraryCandidates(libIntent.query);
-        const reply = libraryPromptReply(libIntent.status, candidates.length, polish);
+      const write = parseBuddyWriteIntent(text);
+      if (write?.kind === "library") {
+        const candidates = await libraryCandidates(write.query);
+        const reply = libraryPromptReply(write.status, candidates.length, polish, write.progress);
         await memoryService.appendMessage(convo.id, "assistant", reply);
         await revealAssistant(
           {
@@ -241,8 +294,29 @@ export default function BuddyPage() {
             polish,
             libraryConfirm:
               candidates.length > 0
-                ? { status: libIntent.status, picks: candidates }
+                ? {
+                    status: write.status,
+                    picks: candidates,
+                    progress: write.progress,
+                    reason: write.reason,
+                  }
                 : undefined,
+          },
+          reply,
+        );
+        return;
+      }
+
+      if (write?.kind === "rate") {
+        const candidates = await libraryCandidates(write.query);
+        const reply = ratePromptReply(write.score, candidates.length, polish);
+        await memoryService.appendMessage(convo.id, "assistant", reply);
+        await revealAssistant(
+          {
+            role: "assistant",
+            polish,
+            rateConfirm:
+              candidates.length > 0 ? { score: write.score, picks: candidates } : undefined,
           },
           reply,
         );
@@ -346,7 +420,7 @@ export default function BuddyPage() {
               <div className="space-y-1.5">
                 <p className="text-xl font-semibold tracking-tight">Night couch. Anime only.</p>
                 <p className="max-w-[34ch] text-sm leading-relaxed text-muted-foreground">
-                  Ask what to watch — I'll drop a cover you can tap. Tell me what you finished and I'll confirm before it hits Library.
+                  Ask what to watch — I'll drop a cover you can tap. Log progress, scores, or finished titles — I confirm before writing Library.
                 </p>
               </div>
             </div>
@@ -414,10 +488,30 @@ export default function BuddyPage() {
                         key={pick.anilistId}
                         pick={pick}
                         status={m.libraryConfirm!.status}
+                        progress={m.libraryConfirm!.progress}
                         polish={Boolean(m.polish)}
                         onConfirm={(p) =>
-                          confirmLibrary(m.libraryConfirm!.status, p, Boolean(m.polish))
+                          confirmLibrary(
+                            m.libraryConfirm!.status,
+                            p,
+                            Boolean(m.polish),
+                            m.libraryConfirm!.progress,
+                            m.libraryConfirm!.reason,
+                          )
                         }
+                      />
+                    ))}
+                  </div>
+                )}
+                {m.rateConfirm && m.rateConfirm.picks.length > 0 && (
+                  <div className="max-w-[85%] space-y-2">
+                    {m.rateConfirm.picks.map((pick) => (
+                      <LibraryConfirmCard
+                        key={`rate-${pick.anilistId}`}
+                        pick={pick}
+                        score={m.rateConfirm!.score}
+                        polish={Boolean(m.polish)}
+                        onConfirm={(p) => confirmRating(m.rateConfirm!.score, p, Boolean(m.polish))}
                       />
                     ))}
                   </div>
@@ -448,7 +542,7 @@ export default function BuddyPage() {
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="e.g. I finished Attack on Titan…"
+            placeholder="e.g. episode 12 Naruto · rate 9 AOT"
             disabled={sending}
             autoComplete="off"
             enterKeyHint="send"
