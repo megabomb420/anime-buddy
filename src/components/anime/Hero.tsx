@@ -6,7 +6,17 @@ import { anilistScore10, animeTitle, formatLabel, seasonLabel } from "@/lib/medi
 import { PosterImage } from "./Poster";
 import type { AnimeSummary } from "@/types/anime";
 
-export function FeaturedHero({ anime }: { anime: AnimeSummary }) {
+export function FeaturedHero({
+  anime,
+  index = 0,
+  total = 1,
+  onSelectIndex,
+}: {
+  anime: AnimeSummary;
+  index?: number;
+  total?: number;
+  onSelectIndex?: (i: number) => void;
+}) {
   const title = animeTitle(anime);
   const score = anilistScore10(anime.anilistScore);
   const cover = anime.coverImage;
@@ -35,7 +45,26 @@ export function FeaturedHero({ anime }: { anime: AnimeSummary }) {
 
       <div className="relative z-10 flex h-full flex-col justify-end px-4 pb-8 pt-16">
         <div className="hero-copy max-w-lg space-y-3">
-          <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-primary">Featured</p>
+          <div className="flex items-center gap-3">
+            <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-primary">Featured</p>
+            {total > 1 && (
+              <div className="flex items-center gap-1.5" role="tablist" aria-label="Featured titles">
+                {Array.from({ length: total }, (_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === index}
+                    aria-label={`Featured ${i + 1} of ${total}`}
+                    className={`h-1.5 rounded-full transition-all ${
+                      i === index ? "w-4 bg-primary" : "w-1.5 bg-foreground/35"
+                    }`}
+                    onClick={() => onSelectIndex?.(i)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
           <div>
             <h1 className="text-[2.15rem] leading-[1.05] font-semibold tracking-tight text-balance">
               {title}

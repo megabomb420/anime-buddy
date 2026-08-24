@@ -1,13 +1,28 @@
 # Anime Buddy — Handover
 
 **Date:** 2026-08-24  
-**App version:** `0.3.6` (Home footer + `version.json` on Pages)  
+**App version:** `0.3.7` (Home footer + `version.json` on Pages)  
 **Owner repo:** [megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy) (public)  
 **Live app:** [https://megabomb420.github.io/anime-buddy/](https://megabomb420.github.io/anime-buddy/)
 
 Read this before changing the product. `handoff.md` (if present) points here.
 
 **Docs rule:** every user-facing change updates **this file and [README.md](./README.md)** in the same commit.
+
+---
+
+## If “nothing changed” on the phone
+
+Most of the time the **PWA service worker** is still serving an old `index-*.js`.
+
+1. Open Home and scroll to the bottom — you must see **`v0.3.7`** (or newer).
+2. If the footer is missing or older: Safari → clear website data for `megabomb420.github.io`, or Chrome → Site settings → Clear & reset; then hard-refresh.
+3. Confirm the server feed:  
+   `curl -s https://megabomb420.github.io/anime-buddy/version.json`  
+   should match the footer version after a successful Pages deploy.
+4. From 0.3.7 the SW uses `skipWaiting` + `clientsClaim`, and `version.json` is **NetworkOnly** (not precached).
+
+Pages deploys can be green while the installed icon still runs yesterday’s bundle until the SW updates.
 
 ---
 
@@ -44,14 +59,24 @@ Worker is **baked in** for Scan + Buddy. Profile can override; reset returns to 
 
 ## Versioning
 
-- `package.json` → semver shown in UI (`0.3.6`+)
+- `package.json` → semver shown in UI
 - CI injects `VITE_APP_VERSION`, `VITE_GIT_SHA` (7 chars), `VITE_BUILD_TIME`
 - Each Pages deploy writes `dist/version.json` `{ version, commit, builtAt }`
-- **Home footer** compares this install to `version.json` (no-store fetch)
-  - *You're on the latest build* vs *Update available* + Update
-- Profile still shows the same block; Home is the one you actually see.
+- **Home footer** (`AppVersionFooter`) compares this install to `version.json`
 
-Bump `package.json` version when shipping a meaningful user-facing change.
+Bump `package.json` when shipping a meaningful user-facing change.
+
+---
+
+## Home / Featured
+
+- Pool: top **8** AniList trending
+- Auto-advance every **45s** (pauses when the tab is hidden)
+- **Dot indicators** under “Featured”; tap a dot to jump
+- Still rotates when `prefers-reduced-motion` is on (only Ken Burns is reduced via CSS)
+- Current featured is filtered out of the Trending row
+
+If Featured never moves: check footer version first (stale SW), then that trending returned ≥2 titles.
 
 ---
 
@@ -65,91 +90,41 @@ Bump `package.json` version when shipping a meaningful user-facing change.
 | Lane | Anime, manga, LN, characters, figures, watch taste, scan, **Library control** |
 | Off-lane | Math, code, news, homework — blocked client + Worker |
 
-### Buddy screen (chat chrome)
-
-Full-viewport chat — not a padded page with `min-h-[70vh]`:
-
-- Header with safe-area (iOS notch)
-- Scrolling thread
-- Composer pinned **above** BottomNav
-- Empty state fills the view: intro + 2-col prompt cards + “Log a title” prefixes
-- New-chat control in the header; last conversation restores on return
-
-Starter chips map to catalog rec queries (including “Popular unread” / “Short tonight”). “I finished…” / “I'm watching…” only prefix the input — they do not send until the user types a title.
-
 ### Library via chat
 
 1. User: `oglądałem Attack on Titan` / `watching Naruto` / `chcę obejrzeć …`
 2. Client parses intent (`src/lib/buddy-library.ts`) → AniList search
-3. Ren asks which exact title → **Confirm** cards (`LibraryConfirmCard`)
+3. Ren asks which exact title → **Confirm** cards
 4. Only on confirm: `persistence.setLibraryStatus`
-
-Statuses: completed · watching · plan_to_watch · on_hold · dropped
 
 ### Spam guard (`src/lib/buddy-spam.ts`)
 
-- Max ~12 messages / min, min gap 450ms
-- Same text 3× / 30s → cooldown
-- Gibberish / noise blocked before AniList or DeepSeek
-- Max ~8 Library confirms / min
-- Cooldown ~25s after trip
+Rate limit, repeats, gibberish, confirm flood → local Ren reply, no API.
 
+### DeepSeek
 
-### DeepSeek (Buddy)
+- Chat model path in Worker source: thinking + stream
+- **Live Worker** may still be older JSON until `wrangler deploy` with Cloudflare secrets
+- PWA typewrites replies either way
 
-- Model: `deepseek-v4-flash`
-- Chat: `thinking: { type: "enabled" }`, `reasoning_effort: high`, **streamed**
-- Reasoning tokens stay on the Worker; the PWA never shows the chain-of-thought
-- Rec / taste / signals: thinking **disabled** (JSON)
-- After `worker/src/**` changes: `cd worker && npx wrangler deploy` (needs Cloudflare login or repo secrets). Live Worker as of 0.3.3 is still the old JSON chat until that deploy succeeds.
+### Persona lock
 
-### Persona lock layers
-
-1. Client `src/lib/buddy/persona.ts` before API
-2. Worker `worker/src/persona.ts` on `POST /api/ai/chat`
-
-No owner bypass. Lock stays on.
+Client + Worker. No unlock bypass in product builds.
 
 ---
 
-## Home / Featured
-
-- Featured cycles top **8** trending titles every **45s**
-- Pauses when tab hidden or `prefers-reduced-motion`
-- Current featured is filtered out of the Trending row
-
----
-
-## Architecture snapshot
+## Architecture
 
 | Concern | Choice |
 | --- | --- |
-| Public app | Vite + React Router, `base` `/anime-buddy/` on Pages |
+| Public app | Vite + React Router, `base` `/anime-buddy/` |
 | Data | Dexie / IndexedDB |
 | Catalog | AniList GraphQL |
-| AI | DeepSeek via Cloudflare Worker only |
-| Scan | `POST /api/ai/vision` |
-| Chat | `POST /api/ai/chat` |
-| PWA | `vite-plugin-pwa`; SPA `404.html` |
-| Launch | No splash |
-| Version | Home footer + `version.json` |
+| AI | DeepSeek via Cloudflare Worker |
+| PWA | `vite-plugin-pwa` autoUpdate, skipWaiting, clientsClaim |
+| Version | Home footer + `version.json` NetworkOnly |
 
-Secrets only in Cloudflare Worker: `DEEPSEEK_API_KEY` (required), `TMDB_API_KEY` (optional).
-
-Never put secrets in `VITE_*`, committed `.env`, or `wrangler.toml`.
-
----
-
-## Routing
-
-| Path | Screen |
-| --- | --- |
-| `/` | Home (featured + trending + version footer) |
-| `/discover` | Discover (safe-area header) |
-| `/scan` | Camera / figurine recognition |
-| `/library` | Library (safe-area header) |
-| `/buddy` | Ren chat (+ library confirm) |
-| `/profile` | Taste, Worker, export |
+Secrets only in Cloudflare Worker. Never in `VITE_*` / repo.
 
 ---
 
@@ -157,56 +132,31 @@ Never put secrets in `VITE_*`, committed `.env`, or `wrangler.toml`.
 
 ### GitHub Pages
 
-- Workflow: `.github/workflows/pages.yml`
-- Push `main` → `npm ci` → inject version env → `GITHUB_PAGES=true npm run build` → write `version.json` → publish `dist/` to **`gh-pages`**
+Push `main` → workflow builds with version env → `gh-pages`.
 
-**tsc pitfall:** keep `"exclude": ["src/**/*.test.ts"]` in `tsconfig.app.json`.
-
-### Cloudflare Worker
+### Worker
 
 ```bash
-cd worker
-npx wrangler login   # once
-npx wrangler deploy
+cd worker && npx wrangler deploy
 ```
 
-Persona / vision changes need a **Worker** redeploy, not only Pages.
+Needs login or `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`.
 
 ---
 
-## Shipped (status)
+## Verify
 
-- [x] Public Pages PWA + live Worker baked in
-- [x] Scan + Buddy on same DeepSeek Worker
-- [x] Ren persona + jailbreak / off-lane locks
-- [x] Featured rotate 45s; no splash
-- [x] Library confirm flow via Ren + spam detector
-- [x] App version + latest check on **Home footer** (Profile still has it)
-- [x] iOS safe-area: Discover / Library / padded screens no longer sit under the status bar
-- [x] Buddy full-height chat (empty state fills the screen; composer above tab bar)
-- [x] Buddy types replies one character at a time (caret + dots). Worker source has DeepSeek thinking on (`deepseek-v4-flash`); live Worker is still JSON until Cloudflare secrets exist.
-- [x] README + this handover (kept in the same commit)
-
----
-
-## Verify after deploy
-
-1. Hard-refresh the live app (clear PWA cache if stuck).
-2. Home bottom shows `v0.3.6` (or current). If a newer build is online, **Update**.
-3. `curl -s https://megabomb420.github.io/anime-buddy/version.json`
-4. Buddy empty screen: prompt cards fill the view; composer sits on the tab bar (no black void).
-5. Buddy: `oglądałem Naruto` → confirm card → appears in Library.
-6. Buddy: “Something funny” → reply **plus tappable cover cards**.
-7. Spam: hammer Send → Ren rate-limit line, no API spam.
-8. Featured changes within ~45s on Home.
+1. Home footer = `v0.3.7` (or current `version.json`).
+2. Featured dots appear; auto-change ≤45s or tap a dot.
+3. Buddy library confirm + spam still behave as before.
+4. After Worker code changes, redeploy Worker separately.
 
 ---
 
 ## Known limitations
 
+- Stale **installed PWA** is the #1 “deploy didn’t work” report.
 - Persona lock is strong, not absolute.
-- Library control is intent-regex + catalog search, not free-form LLM tool-calling.
-- Spam guard is **client-side** (per browser tab memory).
-- Pages and Worker are two deploys.
-- **Live Worker** (`anime-buddy-worker`) still returns JSON `{reply}` (no thinking, no SSE). Thinking + stream are in `worker/src/index.ts` but Actions cannot deploy without repo secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`. Until then the PWA typewrites the JSON reply so it still looks like Ren is typing.
-- Hardware camera QA still light; file upload is the main Scan path tested.
+- Library control is regex + catalog search, not LLM tools.
+- Spam guard is client-side only.
+- Live Worker thinking/SSE depends on a successful Cloudflare deploy.

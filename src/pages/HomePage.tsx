@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   Camera,
@@ -120,11 +120,13 @@ export default function HomePage() {
   const [trending, setTrending] = useState<AnimeSummary[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const poolLenRef = useRef(0);
 
   const featuredPool = useMemo(
     () => trending.slice(0, FEATURED_POOL_SIZE),
     [trending],
   );
+  poolLenRef.current = featuredPool.length;
   const hero =
     featuredPool.length > 0
       ? featuredPool[heroIndex % featuredPool.length] ?? null
@@ -162,7 +164,6 @@ export default function HomePage() {
   useEffect(() => {
     if (featuredPool.length < 2) return;
     if (typeof window === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     let timer: number | undefined;
 
@@ -173,11 +174,15 @@ export default function HomePage() {
       }
     };
 
+    const tick = () => {
+      const n = poolLenRef.current;
+      if (n < 2) return;
+      setHeroIndex((i) => (i + 1) % n);
+    };
+
     const start = () => {
       clear();
-      timer = window.setInterval(() => {
-        setHeroIndex((i) => (i + 1) % featuredPool.length);
-      }, FEATURED_ROTATE_MS);
+      timer = window.setInterval(tick, FEATURED_ROTATE_MS);
     };
 
     const onVisibility = () => {
@@ -245,7 +250,13 @@ export default function HomePage() {
       {catalogLoading ? (
         <HeroSkeleton />
       ) : hero ? (
-        <FeaturedHero key={hero.anilistId} anime={hero} />
+        <FeaturedHero
+          key={hero.anilistId}
+          anime={hero}
+          index={heroIndex % Math.max(featuredPool.length, 1)}
+          total={featuredPool.length}
+          onSelectIndex={setHeroIndex}
+        />
       ) : null}
 
       <section className="mt-8">

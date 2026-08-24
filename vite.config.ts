@@ -17,7 +17,6 @@ function spaGithubPagesFallback() {
   }
 }
 
-// https://vite.dev/config/
 export default defineConfig({
   base: process.env.GITHUB_PAGES === "true" ? "/anime-buddy/" : "./",
   plugins: [
@@ -29,14 +28,13 @@ export default defineConfig({
       manifest: {
         name: "Anime Buddy",
         short_name: "Anime Buddy",
-        description: "Your intelligent anime friend — discover Crunchyroll anime that fit your taste.",
+        description: "Your intelligent anime friend — discover anime that fit your taste.",
         theme_color: "#0b0b10",
         background_color: "#0b0b10",
         display: "standalone",
         orientation: "portrait",
         start_url: "./",
         icons: [
-          // TODO: add real artwork icons in public/ before release.
           {
             src: "pwa-icon.svg",
             sizes: "any",
@@ -46,8 +44,15 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Never cache API responses blindly — catalog/AI calls must stay live.
+        skipWaiting: true,
+        clientsClaim: true,
         navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.endsWith("/version.json"),
+            handler: "NetworkOnly",
+          },
+        ],
       },
     }),
     spaGithubPagesFallback(),
