@@ -9,21 +9,77 @@
 
 ---
 
+## Worker status (priority #1)
+
+| | Source (`main`) | Live Worker |
+| --- | --- | --- |
+| `/api/health` | `chat: "sse"`, `thinking: true`, `tools: true`, `catalog: "anilist"` | **old** — only `{ ok, vision, tmdb }` |
+| AniList tools on chat | `search_anime`, `get_anime`, `browse_catalog`, `search_character` when client sent no facts | **not deployed** |
+| GitHub Action `Deploy Worker` | runs on `worker/**` push | **fails** — `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` empty |
+
+PWA still works: it pre-fetches AniList facts client-side (`buddy-catalog.ts`) and stuffs them into the prompt. Worker tools only matter when the client sends **no** `catalogFacts` / picks.
+
+### Deploy Worker (you must do this once)
+
+**Option A — CLI (fastest)**
+
+```bash
+cd worker
+npm ci
+npx wrangler login          # once
+npx wrangler deploy
+# secrets already on the Worker stay; only re-put if missing:
+# npx wrangler secret put DEEPSEEK_API_KEY
+```
+
+**Option B — fix CI**
+
+1. Cloudflare → API Tokens → create token with **Workers Scripts: Edit**  
+2. GitHub repo → Settings → Secrets and variables → Actions  
+3. Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`  
+4. Actions → **Deploy Worker** → Run workflow  
+
+### Verify after deploy
+
+```bash
+curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
+```
+
+Expect:
+
+```json
+{
+  "ok": true,
+  "service": "anime-buddy-worker",
+  "vision": true,
+  "tmdb": false,
+  "chat": "sse",
+  "thinking": true,
+  "tools": true,
+  "catalog": "anilist"
+}
+```
+
+(`tmdb: true` only if `TMDB_API_KEY` secret is set.)
+
+---
+
 ## DeepSeek LLM — top 10 roadmap (text only, no vision)
 
 | # | Feature | Status |
 | --- | --- | --- |
-| 1 | **Progress via chat** (`episode 12 Naruto` / `jestem na 12 odcinku …`) → confirm → Library | **Shipped 0.3.8** |
-| 2 | **Ratings via chat** (`rate 9 AOT` / `daję 8.5 Naruto`) → confirm → score + taste | **Shipped 0.3.8** |
-| 3 | **After X / similar** (`what next after …` / `po …`) → catalog similar recs | **Shipped 0.3.8** |
-| 4 | **Natural time budget** (`mam 40 min`) → tonight-style query | **Shipped 0.3.8** |
-| 5 | **Drop + reason** (`rzuciłem X bo filler`) → dropped + free-text taste signal | **Shipped 0.3.8** |
+| 1 | **Progress via chat** → confirm → Library | **Shipped 0.3.8** |
+| 2 | **Ratings via chat** → confirm → score + taste | **Shipped 0.3.8** |
+| 3 | **After X / similar** → catalog similar recs | **Shipped 0.3.8** |
+| 4 | **Natural time budget** → tonight-style query | **Shipped 0.3.8** |
+| 5 | **Drop + reason** → dropped + free-text taste signal | **Shipped 0.3.8** |
 | 6 | Batch multi-title log in one message | Next |
 | 7 | Taste DNA blurb (Worker `analyzeTaste` on Profile rebuild) | Next |
 | 8 | Spoiler level (settings + prompt) | Next |
 | 9 | Session summary every N turns (token save) | Later |
 | 10 | Compare two catalog titles side by side | Later |
-| — | **AniList facts in chat** (`ile odcinków ma …`, `kto to …`, trending) → DeepSeek talks from catalog dump, not memory | **Shipped 0.3.11** |
+| — | **AniList facts in chat** (PWA pre-fetch) | **Shipped 0.3.11** |
+| — | **Worker AniList tools + health fields** | **Source ready — needs deploy** |
 
 Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 
@@ -37,10 +93,9 @@ Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 - `ile odcinków ma One Piece` → episode count from AniList + cover
 - `kto to Lelouch` → character + their anime from AniList
 - `what's trending` / `ten sezon` → live list + covers
+- `znajdź Spy x Family` / bare `spy x family` → catalog cards (no DeepSeek)
 
-Ren does **not** call AniList himself. The PWA looks titles up (`src/lib/buddy-catalog.ts`) and stuffs compact facts into the prompt. Worker source has tools (`search_anime`, `get_anime`, `browse_catalog`, `search_character`) for when no facts were sent — needs a Worker deploy.
-
-`znajdź Spy x Family` stays a fast catalog-card search (no DeepSeek).  
+Ren does **not** invent catalog facts. The PWA looks titles up (`src/lib/buddy-catalog.ts`) and stuffs compact facts into the prompt. Worker tools cover turns with no client facts — **after** a successful Worker deploy.
 
 ---
 
@@ -56,9 +111,13 @@ Ren does **not** call AniList himself. The PWA looks titles up (`src/lib/buddy-c
 
 Local-first PWA: Discover, Library, Scan (vision), **Ren** chat. IndexedDB only. AniList catalog. DeepSeek only via Worker.
 
-### Ren
+### Ren router (0.3.11+)
 
-Anime lane; client + Worker persona lock; library/rating writes only after confirm; spam guard client-side.
+1. **Write** — library / rate / progress → Confirm cards (no DeepSeek)  
+2. **Lookup** — `znajdź` / bare title → catalog cards (no DeepSeek)  
+3. **Chat + facts** — rec / episodes / cast / trending → PWA facts + DeepSeek stream  
+
+Persona lock client + Worker. Spam guard client-side.
 
 ### Featured
 
@@ -67,4 +126,4 @@ Top 8 trending, 45s rotate, dots to jump.
 ### Deploy
 
 - Pages: push `main`  
-- Worker: `cd worker && npx wrangler deploy` (secrets on Cloudflare)
+- Worker: **must** have Cloudflare auth (see above) — Pages alone is not enough
