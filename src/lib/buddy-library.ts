@@ -28,10 +28,25 @@ export type BuddyWriteIntent =
   | ({ kind: "library" } & LibraryIntent)
   | RateIntent;
 
+/**
+ * Suffix form: "add X to watched" / "dodaj X do obejrzanych".
+ * Must run BEFORE STATUS_PATTERNS — otherwise the generic plan "add X"
+ * pattern swallows the title together with the trailing status word.
+ */
+const ADD_TO_STATUS: Array<{ status: LibraryStatus; re: RegExp }> = [
+  { status: "completed", re: /^add\s+(.+?)\s+to\s+(?:my\s+)?(?:watched|completed)\s*$/i },
+  { status: "completed", re: /^dodaj\s+(.+?)\s+do\s+(?:obejrzanych|ukończonych|completed)\s*$/i },
+  { status: "watching", re: /^add\s+(.+?)\s+to\s+(?:my\s+)?watching\s*$/i },
+  { status: "watching", re: /^dodaj\s+(.+?)\s+do\s+oglądanych\s*$/i },
+  { status: "plan_to_watch", re: /^add\s+(.+?)\s+to\s+(?:my\s+)?(?:watchlist|list|plans?|plan\s+to\s+watch)\s*$/i },
+  { status: "plan_to_watch", re: /^dodaj\s+(.+?)\s+do\s+(?:listy|watchlisty|planów)\s*$/i },
+  { status: "dropped", re: /^add\s+(.+?)\s+to\s+dropped\s*$/i },
+];
+
 const STATUS_PATTERNS: Array<{ status: LibraryStatus; re: RegExp }> = [
   {
     status: "completed",
-    re: /^(?:skończył[ae]?m|obejrzał[ae]?m|oglądał[ae]?m|przeszedł[ae]?m|dopatrzył[ae]?m|(?:i\s+)?(?:watched|finished|completed)|i(?:'| a)?m done with)\s+(.+)$/i,
+    re: /^(?:skończył[ae]?m(?:\s+oglądać)?|obejrzał[ae]?m|już obejrzał[ae]?m|oglądał[ae]?m|przeszedł[ae]?m|dopatrzył[ae]?m|dawno obejrzane|skończone|(?:i\s+)?(?:just\s+)?(?:watched|finished|completed|binged)|i(?:'| a)?m done with|done with|caught up (?:with|on)|add\s+to\s+(?:my\s+)?(?:watched|completed)|dodaj\s+do\s+(?:obejrzanych|ukończonych))\s+(.+)$/i,
   },
   {
     status: "watching",
@@ -84,6 +99,13 @@ function cleanTitle(q: string): string {
   return q
     .replace(/[.!?]+$/, "")
     .replace(/\s+(?:bo|because|boże)\s+.+$/i, "")
+    // Safety net: strip a trailing status tail that slipped into the title
+    // ("spy x family to watched" → "spy x family").
+    .replace(
+      /\s+to\s+(?:my\s+)?(?:watched|completed|watching|watchlist|list|plan(?:\s+to\s+watch)?|dropped)$/i,
+      "",
+    )
+    .replace(/\s+do\s+(?:obejrzanych|ukończonych|oglądanych|listy|watchlisty|planów)$/i, "")
     .trim();
 }
 
@@ -190,6 +212,14 @@ export function parseLibraryIntent(raw: string): LibraryIntent | null {
   if (mark?.[1] && mark[2]) {
     const query = cleanTitle(mark[1]);
     return withTitles({ status: statusFromWord(mark[2]), query }, true);
+  }
+
+  for (const { status, re } of ADD_TO_STATUS) {
+    const m = text.match(re);
+    if (m?.[1]) {
+      const query = cleanTitle(m[1]);
+      if (query.length >= 2) return withTitles({ status, query }, true);
+    }
   }
 
   for (const { status, re } of STATUS_PATTERNS) {

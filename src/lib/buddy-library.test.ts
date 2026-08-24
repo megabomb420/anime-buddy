@@ -47,6 +47,32 @@ describe("parseLibraryIntent", () => {
     assert.equal(intent?.status, "watching");
     assert.deepEqual(intent?.titles, ["Naruto", "Bleach", "One Piece"]);
   });
+
+  it("parses suffix form 'add X to watched' as completed", () => {
+    const intent = parseLibraryIntent("Add spy x family to watched");
+    assert.ok(intent);
+    assert.equal(intent?.status, "completed");
+    assert.equal(intent?.query, "spy x family");
+  });
+
+  it("parses bare finished variants", () => {
+    assert.equal(parseLibraryIntent("I finished spy family")?.status, "completed");
+    assert.equal(parseLibraryIntent("done with attack titan")?.query, "attack titan");
+    assert.equal(parseLibraryIntent("caught up with Frieren")?.status, "completed");
+    assert.equal(parseLibraryIntent("binged solo leveling")?.status, "completed");
+  });
+
+  it("parses Polish completed variants", () => {
+    assert.equal(parseLibraryIntent("obejrzałem spyxfamily")?.status, "completed");
+    assert.equal(parseLibraryIntent("dodaj Naruto do obejrzanych")?.status, "completed");
+    assert.equal(parseLibraryIntent("skończyłem oglądać Bleach")?.query, "Bleach");
+  });
+
+  it("keeps 'add X to my list' as plan_to_watch", () => {
+    const intent = parseLibraryIntent("add Naruto to my list");
+    assert.equal(intent?.status, "plan_to_watch");
+    assert.equal(intent?.query, "Naruto");
+  });
 });
 
 describe("splitTitleList", () => {

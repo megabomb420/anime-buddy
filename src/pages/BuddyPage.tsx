@@ -27,7 +27,7 @@ import {
   rateDoneReply,
   ratePromptReply,
 } from "@/lib/buddy-library";
-import { parseBareTitleQuery, parseLookupQuery } from "@/lib/catalog-search";
+import { parseBareTitleQuery, parseLookupQuery, resolveTitleMatch } from "@/lib/catalog-search";
 import { factsFromPicks, resolveBuddyCatalog } from "@/lib/buddy-catalog";
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { animeTitle } from "@/lib/media";
@@ -107,10 +107,27 @@ async function libraryCandidates(query: string, limit = 6): Promise<RecPick[]> {
   return results.map((a) => recPickFromAnime(a));
 }
 
+/**
+ * Resolve one title to a confident match, up to 3 candidates, or a single
+ * best-guess card. A fuzzy "none" never dead-ends on "clearer title" when
+ * there is a plausible catalog entry to offer.
+ */
+async function libraryCandidatesForTitle(title: string, limit = 6): Promise<RecPick[]> {
+  const results = await animeCatalogService.search(title, limit);
+  const resolution = resolveTitleMatch(title, results);
+  if (resolution.kind === "match") return [recPickFromAnime(resolution.anime)];
+  if (resolution.kind === "candidates") return resolution.items.map((a) => recPickFromAnime(a));
+  return resolution.bestGuess ? [recPickFromAnime(resolution.bestGuess)] : [];
+}
+
 async function libraryCandidatesForTitles(titles: string[]): Promise<RecPick[]> {
   const per = titles.length > 1 ? 2 : 6;
-  const groups = await Promise.all(titles.slice(0, 6).map((t) => libraryCandidates(t, per)));
-  return mergePicks(groups.flat(), [], titles.length > 1 ? 12 : 6);
+  const groups = await Promise.all(
+    titles.slice(0, 6).map((t) =>
+      titles.length > 1 ? libraryCandidates(t, per) : libraryCandidatesForTitle(t, per),
+    ),
+  );
+  return mergePicks(groups.flat(), [], titles.length > 1 ? 12 : 3);
 }
 
 function mergePicks(primary: RecPick[], extra: RecPick[], limit = 4): RecPick[] {

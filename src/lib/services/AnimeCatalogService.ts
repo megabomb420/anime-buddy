@@ -7,6 +7,7 @@
 import { resolveAgeGuide } from "@/lib/age/normalize";
 import { resolveAvailability } from "@/lib/availability/resolve";
 import {
+  extractSeasonHint,
   rankByTitleMatch,
   searchQueryVariants,
   scoreTitleMatch,
@@ -51,7 +52,9 @@ export class AnimeCatalogService {
     const hit = searchMemo.get(key);
     if (hit && Date.now() - hit.at < SEARCH_TTL_MS) return hit.items;
 
-    const variants = searchQueryVariants(query);
+    // "spy family s1" → search "spy family", prefer season 1 when ranking.
+    const { title, season } = extractSeasonHint(query);
+    const variants = searchQueryVariants(title);
     // Sequential — parallel AniList bursts often 429 and return empty.
     const collected: AnimeSummary[] = [];
     for (const v of variants.slice(0, 5)) {
@@ -59,18 +62,18 @@ export class AnimeCatalogService {
         const batch = await providers.catalog.searchAnime(v, Math.max(limit, 12));
         collected.push(...batch);
         // Early exit when we already have a strong title hit.
-        const ranked = rankByTitleMatch(query, uniqueById(collected));
-        if (ranked.some((a) => scoreTitleMatch(query, a) >= 80)) break;
+        const ranked = rankByTitleMatch(query, uniqueById(collected), season);
+        if (ranked.some((a) => scoreTitleMatch(query, a, season) >= 80)) break;
       } catch {
         /* try next variant */
       }
     }
 
     let merged = uniqueById(collected);
-    merged = rankByTitleMatch(query, merged);
+    merged = rankByTitleMatch(query, merged, season);
 
     // Soft threshold — SPY×FAMILY vs "spy x family" must stay in.
-    const strong = merged.filter((a) => scoreTitleMatch(query, a) >= 35);
+    const strong = merged.filter((a) => scoreTitleMatch(query, a, season) >= 35);
     const results = (strong.length > 0 ? strong : merged).slice(0, limit);
 
     searchMemo.set(key, { at: Date.now(), items: results });
