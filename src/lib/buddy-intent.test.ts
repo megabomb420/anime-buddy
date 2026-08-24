@@ -14,6 +14,12 @@ describe("wantsRecommendation", () => {
     assert.equal(wantsRecommendation("ile odcinków ma One Piece"), false);
     assert.equal(wantsRecommendation("kto to Lelouch"), false);
   });
+
+  it("treats starter chips as rec asks", () => {
+    assert.equal(wantsRecommendation("Popular unread"), true);
+    assert.equal(wantsRecommendation("Short tonight"), true);
+    assert.equal(wantsRecommendation("Suitable 12+"), true);
+  });
 });
 
 describe("interpretBuddyQuery", () => {
@@ -27,5 +33,11 @@ describe("interpretBuddyQuery", () => {
     const p = interpretBuddyQuery("something funny");
     assert.equal(p.context, "mood-funny");
     assert.equal(isVagueCatalogQuery(p.query), false);
+  });
+
+  it("maps starter chips to their catalog query", () => {
+    const p = interpretBuddyQuery("Popular unread");
+    assert.equal(p.context, "because-you-like");
+    assert.match(p.query, /popular/i);
   });
 });

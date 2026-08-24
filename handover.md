@@ -1,7 +1,7 @@
 # Anime Buddy — Handover
 
 **Date:** 2026-08-24  
-**App version:** `0.3.0` (see Profile → App version + `version.json` on Pages)  
+**App version:** `0.3.1` (see Profile → App version + `version.json` on Pages)  
 **Owner repo:** [megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy) (public)  
 **Live app:** [https://megabomb420.github.io/anime-buddy/](https://megabomb420.github.io/anime-buddy/)
 
@@ -42,7 +42,7 @@ Worker is **baked in** for Scan + Buddy. Profile can override; reset returns to 
 
 ## Versioning
 
-- `package.json` → semver shown in UI (`0.3.0`+)
+- `package.json` → semver shown in UI (`0.3.1`+)
 - CI injects `VITE_APP_VERSION`, `VITE_GIT_SHA` (7 chars), `VITE_BUILD_TIME`
 - Each Pages deploy writes `dist/version.json` `{ version, commit, builtAt }`
 - **Profile → App version** compares this install to `version.json` (no-store fetch)
@@ -61,6 +61,18 @@ Bump `package.json` version when shipping a meaningful user-facing change.
 | Voice | Short, dry; Polish in → Polish out |
 | Lane | Anime, manga, LN, characters, figures, watch taste, scan, **Library control** |
 | Off-lane | Math, code, news, homework — blocked client + Worker |
+
+### Buddy screen (chat chrome)
+
+Full-viewport chat — not a padded page with `min-h-[70vh]`:
+
+- Header with safe-area (iOS notch)
+- Scrolling thread
+- Composer pinned **above** BottomNav
+- Empty state fills the view: intro + 2-col prompt cards + “Log a title” prefixes
+- New-chat control in the header; last conversation restores on return
+
+Starter chips map to catalog rec queries (including “Popular unread” / “Short tonight”). “I finished…” / “I'm watching…” only prefix the input — they do not send until the user types a title.
 
 ### Library via chat
 
@@ -156,6 +168,7 @@ Persona / vision changes need a **Worker** redeploy, not only Pages.
 - [x] Featured rotate 45s; no splash
 - [x] Library confirm flow via Ren + spam detector
 - [x] App version + latest check on Profile
+- [x] Buddy full-height chat (empty state fills the screen; composer above tab bar)
 - [x] README + this handover
 
 ---
@@ -163,11 +176,13 @@ Persona / vision changes need a **Worker** redeploy, not only Pages.
 ## Verify after deploy
 
 1. Hard-refresh the live app (clear PWA cache if stuck).
-2. Profile → **App version** shows `v0.3.0` (or current) and *latest* or *update*.
+2. Profile → **App version** shows `v0.3.1` (or current) and *latest* or *update*.
 3. `curl -s https://megabomb420.github.io/anime-buddy/version.json`
-4. Buddy: `oglądałem Naruto` → confirm card → appears in Library.
-5. Spam: hammer Send → Ren rate-limit line, no API spam.
-6. Featured changes within ~45s on Home.
+4. Buddy empty screen: prompt cards fill the view; composer sits on the tab bar (no black void).
+5. Buddy: `oglądałem Naruto` → confirm card → appears in Library.
+6. Buddy: “Something funny” → reply **plus tappable cover cards**.
+7. Spam: hammer Send → Ren rate-limit line, no API spam.
+8. Featured changes within ~45s on Home.
 
 ---
 

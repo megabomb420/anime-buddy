@@ -25,6 +25,7 @@ export function wantsRecommendation(raw: string): boolean {
   const q = raw.trim();
   if (q.length < 3) return false;
   if (NOT_REC.test(q)) return false;
+  if (BUDDY_CHIPS.some((c) => c.label.toLowerCase() === q.toLowerCase())) return true;
   return REC_ASK.test(q);
 }
 
@@ -40,6 +41,9 @@ export function isVagueCatalogQuery(raw: string): boolean {
 export function interpretBuddyQuery(raw: string): BuddyPrompt {
   const q = raw.trim();
   const lower = q.toLowerCase();
+
+  const chip = BUDDY_CHIPS.find((c) => c.label.toLowerCase() === lower);
+  if (chip) return chip;
 
   const like = q.match(/(?:podobn\w*\s+do|like|jak)\s+(.+)$/i);
   if (like?.[1]) {

@@ -16,6 +16,10 @@ export class MemoryService {
     return persistence.createConversation(title);
   }
 
+  async latestConversation(): Promise<Conversation | undefined> {
+    return db.conversations.orderBy("updatedAt").reverse().first();
+  }
+
   async appendMessage(
     conversationId: string,
     role: MessageRole,

@@ -13,6 +13,7 @@ import ScanPage from "@/pages/ScanPage";
 export default function App() {
   const { pathname } = useLocation();
   const scan = pathname === "/scan";
+  const buddy = pathname === "/buddy";
   const edgeToEdge = pathname === "/" || pathname === "/discover";
 
   return (
@@ -23,7 +24,11 @@ export default function App() {
         </Routes>
       ) : (
         <>
-          <main className={edgeToEdge ? "pb-24" : "mx-auto max-w-md px-4 pb-24 pt-6"}>
+          <main
+            className={
+              buddy ? "" : edgeToEdge ? "pb-24" : "mx-auto max-w-md px-4 pb-24 pt-6"
+            }
+          >
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/discover" element={<DiscoverPage />} />
