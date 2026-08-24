@@ -152,7 +152,7 @@ export const persistence = {
   async getLibrary(status?: LibraryStatus): Promise<LibraryEntry[]> {
     if (status) return db.libraryEntries.where("status").equals(status).toArray();
     return db.libraryEntries.toArray();
-  }
+  },
 
   /** Episode caps for Ren's spoiler lock (library progress ∪ spoilerStates ∪ viewingProgress). */
   async getSpoilerLimits(): Promise<
