@@ -393,7 +393,7 @@ export default function BuddyPage() {
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="np. oglądałem Attack on Titan…"
+            placeholder="e.g. I finished Attack on Titan…"
             disabled={sending}
             autoComplete="off"
             enterKeyHint="send"
