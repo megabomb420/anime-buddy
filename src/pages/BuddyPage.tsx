@@ -23,6 +23,7 @@ import {
   rateDoneReply,
   ratePromptReply,
 } from "@/lib/buddy-library";
+import { parseLookupQuery } from "@/lib/catalog-search";
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { animeTitle } from "@/lib/media";
 import { looksPolish } from "@/lib/buddy/persona";
@@ -92,6 +93,18 @@ async function catalogPicksFor(text: string): Promise<RecPick[]> {
 async function libraryCandidates(query: string): Promise<RecPick[]> {
   const results = await animeCatalogService.search(query, 6);
   return results.map((a) => recPickFromAnime(a));
+}
+
+function lookupReply(query: string, count: number, polish: boolean): string {
+  if (count === 0) {
+    return polish
+      ? `Nie znalazłem „${query}” w katalogu AniList. Spróbuj innego zapisu tytułu.`
+      : `Nothing matched “${query}” in the AniList catalog. Try another spelling.`;
+  }
+  if (count === 1) {
+    return polish ? "To ten tytuł z katalogu:" : "This catalog match:";
+  }
+  return polish ? "Trafienia z katalogu:" : "Catalog matches:";
 }
 
 function TypingDots() {
@@ -323,6 +336,22 @@ export default function BuddyPage() {
         return;
       }
 
+      const lookup = parseLookupQuery(text);
+      if (lookup) {
+        const candidates = await libraryCandidates(lookup);
+        const reply = lookupReply(lookup, candidates.length, polish);
+        await memoryService.appendMessage(convo.id, "assistant", reply);
+        await revealAssistant(
+          {
+            role: "assistant",
+            polish,
+            picks: candidates.length > 0 ? candidates : undefined,
+          },
+          reply,
+        );
+        return;
+      }
+
       const tastePromise = persistence.getTasteProfile().catch(() => undefined);
       const picksPromise = wantsRecommendation(text)
         ? catalogPicksFor(text)
@@ -542,7 +571,7 @@ export default function BuddyPage() {
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="e.g. episode 12 Naruto · rate 9 AOT"
+            placeholder="e.g. find spy x family · rate 9 AOT"
             disabled={sending}
             autoComplete="off"
             enterKeyHint="send"
