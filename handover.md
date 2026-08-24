@@ -53,7 +53,7 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 | Pages | **v0.3.20** — `version.json` must match `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live (CLI deploy). Persona includes spoiler lock. |
-| Worker GitHub Action | Secrets configured 2026-08-24 — CI deploy armed, verify latest run is green |
+| Worker GitHub Action | Secrets set 2026-08-24, but `npx wrangler deploy` step still **fails**. Correct account ID: `d357be58f5550eea081b0c8d80824abf` (Whip Blanket). Likely token lacks **Workers Scripts: Edit** — check the run log in Actions |
 | Owner CLI | `wrangler` logged in as `przemek.fall@gmail.com` / account Whip Blanket. `cd worker && npx wrangler deploy` works on that machine |
 
 If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.20**.
