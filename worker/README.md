@@ -29,7 +29,7 @@ Do **not** put the key in the app, in `VITE_` env vars, or in `wrangler.toml`.
 | Route | Purpose |
 | --- | --- |
 | `GET /api/health` | Liveness. `{ ok, vision, tmdb }` — `vision` is true only when the secret is set |
-| `POST /api/ai/chat` | Buddy conversation (DeepSeek) |
+| `POST /api/ai/chat` | Buddy conversation. Thinking on (`deepseek-v4-flash`). Streams SSE `{c}` deltas; JSON `{reply}` only for locked/off-lane lines |
 | `POST /api/ai/recommend` | Semantic reranking of a 10–30 candidate pool |
 | `POST /api/ai/taste` | Taste DNA interpretation |
 | `POST /api/ai/signals` | Taste-signal extraction from notes |

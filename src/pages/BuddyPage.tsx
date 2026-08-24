@@ -24,9 +24,10 @@ import {
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { animeTitle } from "@/lib/media";
 import { looksPolish } from "@/lib/buddy/persona";
+import { typeOut } from "@/lib/buddy-type";
 import { persistence } from "@/lib/db/persistence";
 import { memoryService } from "@/lib/services/MemoryService";
-import { replyAsBuddy } from "@/lib/services/BuddyChatService";
+import { streamAsBuddy } from "@/lib/services/BuddyChatService";
 import { recommendationService } from "@/lib/services/RecommendationService";
 import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
 import { getWorkerUrl } from "@/lib/worker-gateway";
@@ -37,6 +38,7 @@ interface UiMessage {
   role: "user" | "assistant";
   content: string;
   polish?: boolean;
+  streaming?: boolean;
   picks?: RecPick[];
   libraryConfirm?: {
     status: LibraryStatus;
@@ -156,7 +158,7 @@ export default function BuddyPage() {
       const reply = spamReply(spam.reason, polish);
       const convo = await ensureConvo();
       await memoryService.appendMessage(convo.id, "assistant", reply);
-      setMessages((prev) => [...prev, { role: "assistant", content: reply, polish }]);
+      await revealAssistant({ role: "assistant", content: "", polish }, reply);
       return;
     }
 
@@ -164,7 +166,40 @@ export default function BuddyPage() {
     const convo = await ensureConvo();
     const reply = libraryDoneReply(animeTitle(pick), status, polish);
     await memoryService.appendMessage(convo.id, "assistant", reply);
-    setMessages((prev) => [...prev, { role: "assistant", content: reply, polish }]);
+    await revealAssistant({ role: "assistant", content: "", polish }, reply);
+  }
+
+  function patchLastAssistant(patch: Partial<UiMessage>) {
+    setMessages((prev) => {
+      const copy = [...prev];
+      const i = copy.length - 1;
+      if (i < 0 || copy[i].role !== "assistant") return prev;
+      copy[i] = { ...copy[i], ...patch };
+      return copy;
+    });
+  }
+
+  async function revealAssistant(base: Omit<UiMessage, "content"> & { content?: string }, text: string) {
+    let added = false;
+    await typeOut(text, (shown) => {
+      if (!shown) return;
+      if (!added) {
+        added = true;
+        setMessages((prev) => [...prev, { ...base, role: "assistant", content: shown, streaming: true }]);
+      } else {
+        patchLastAssistant({ content: shown, streaming: true });
+      }
+    });
+    if (!added) {
+      setMessages((prev) => [...prev, { ...base, role: "assistant", content: text, streaming: false }]);
+    } else {
+      patchLastAssistant({
+        content: text,
+        streaming: false,
+        picks: base.picks,
+        libraryConfirm: base.libraryConfirm,
+      });
+    }
   }
 
   async function send(textRaw?: string) {
@@ -176,11 +211,13 @@ export default function BuddyPage() {
     if (!spam.ok && spam.reason) {
       if (!textRaw) setInput("");
       const reply = spamReply(spam.reason, polish);
-      setMessages((prev) => [
-        ...prev,
-        { role: "user", content: text, polish },
-        { role: "assistant", content: reply, polish },
-      ]);
+      setMessages((prev) => [...prev, { role: "user", content: text, polish }]);
+      setSending(true);
+      try {
+        await revealAssistant({ role: "assistant", polish }, reply);
+      } finally {
+        setSending(false);
+      }
       return;
     }
 
@@ -198,27 +235,39 @@ export default function BuddyPage() {
         const candidates = await libraryCandidates(libIntent.query);
         const reply = libraryPromptReply(libIntent.status, candidates.length, polish);
         await memoryService.appendMessage(convo.id, "assistant", reply);
-        setMessages([
-          ...next,
+        await revealAssistant(
           {
             role: "assistant",
-            content: reply,
             polish,
             libraryConfirm:
               candidates.length > 0
                 ? { status: libIntent.status, picks: candidates }
                 : undefined,
           },
-        ]);
+          reply,
+        );
         return;
       }
 
-      const [picks, taste] = await Promise.all([
-        catalogPicksFor(text),
-        persistence.getTasteProfile().catch(() => undefined),
-      ]);
+      const picksPromise = catalogPicksFor(text);
+      const tastePromise = persistence.getTasteProfile().catch(() => undefined);
+      const [picks, taste] = await Promise.all([picksPromise, tastePromise]);
 
-      const reply = await replyAsBuddy(
+      let added = false;
+      const onDelta = (shown: string) => {
+        if (!shown) return;
+        if (!added) {
+          added = true;
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: shown, polish, streaming: true },
+          ]);
+        } else {
+          patchLastAssistant({ content: shown, streaming: true });
+        }
+      };
+
+      const reply = await streamAsBuddy(
         next.map((m) => ({ role: m.role, content: m.content })),
         {
           catalogPicks: picks.map((p) => ({
@@ -229,14 +278,17 @@ export default function BuddyPage() {
           })),
           tasteSummary: taste?.summary,
         },
+        onDelta,
       );
+
       await memoryService.appendMessage(convo.id, "assistant", reply);
-      setMessages([...next, { role: "assistant", content: reply, polish, picks }]);
+      if (!added) {
+        setMessages((prev) => [...prev, { role: "assistant", content: reply, polish, picks }]);
+      } else {
+        patchLastAssistant({ content: reply, streaming: false, picks });
+      }
     } catch {
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: "I couldn't respond just now." },
-      ]);
+      await revealAssistant({ role: "assistant" }, "I couldn't respond just now.");
     } finally {
       setSending(false);
     }
@@ -348,6 +400,7 @@ export default function BuddyPage() {
                     m.role === "user"
                       ? "ml-auto bg-primary text-primary-foreground"
                       : "mr-auto border border-border bg-card",
+                    m.streaming && "buddy-caret",
                   )}
                 >
                   {m.content}
@@ -376,7 +429,7 @@ export default function BuddyPage() {
                 )}
               </div>
             ))}
-            {sending && <TypingDots />}
+            {sending && messages[messages.length - 1]?.streaming !== true && <TypingDots />}
           </div>
         )}
       </div>

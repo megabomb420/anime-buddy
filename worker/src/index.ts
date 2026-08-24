@@ -38,6 +38,7 @@ export interface Env {
 
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const TMDB_URL = "https://api.themoviedb.org/3";
+const BUDDY_MODEL = "deepseek-v4-flash";
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const origin = request.headers.get("Origin") ?? "";
@@ -75,7 +76,8 @@ async function deepseekChat(
       Authorization: `Bearer ${requireDeepSeekKey(env)}`,
     },
     body: JSON.stringify({
-      model: "deepseek-chat",
+      model: BUDDY_MODEL,
+      thinking: { type: "disabled" },
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -89,11 +91,13 @@ async function deepseekChat(
   return data.choices?.[0]?.message?.content ?? "";
 }
 
-async function deepseekBuddyChat(
+async function deepseekBuddyChatStream(
   env: Env,
   system: string,
   messages: ChatMessage[],
-): Promise<string> {
+  lastUser: string,
+  cors: Record<string, string>,
+): Promise<Response> {
   const res = await fetch(DEEPSEEK_URL, {
     method: "POST",
     headers: {
@@ -101,15 +105,75 @@ async function deepseekBuddyChat(
       Authorization: `Bearer ${requireDeepSeekKey(env)}`,
     },
     body: JSON.stringify({
-      model: "deepseek-chat",
-      temperature: 0.65,
-      max_tokens: 450,
+      model: BUDDY_MODEL,
+      thinking: { type: "enabled" },
+      reasoning_effort: "high",
+      max_tokens: 1024,
+      stream: true,
       messages: [{ role: "system", content: system }, ...messages],
     }),
   });
-  if (!res.ok) throw new Error(`DeepSeek HTTP ${res.status}`);
-  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  return data.choices?.[0]?.message?.content ?? "";
+  if (!res.ok || !res.body) throw new Error(`DeepSeek HTTP ${res.status}`);
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  const upstream = res.body.getReader();
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let buffer = "";
+      let full = "";
+      const send = (obj: unknown) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
+      };
+      try {
+        while (true) {
+          const { done, value } = await upstream.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const payload = trimmed.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+            let json: {
+              choices?: Array<{ delta?: { content?: string; reasoning_content?: string } }>;
+            };
+            try {
+              json = JSON.parse(payload) as typeof json;
+            } catch {
+              continue;
+            }
+            const piece = json.choices?.[0]?.delta?.content ?? "";
+            if (piece) {
+              full += piece;
+              send({ c: piece });
+            }
+          }
+        }
+        const guarded = guardReply(full, lastUser);
+        if (guarded !== full) send({ r: guarded });
+        send({ d: true });
+        controller.close();
+      } catch (err) {
+        send({ r: guardReply("", lastUser) || "DeepSeek went quiet. Try me again in a second." });
+        controller.close();
+        void err;
+      }
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      ...cors,
+    },
+  });
 }
 
 const VISION_SYSTEM =
@@ -237,8 +301,7 @@ export default {
               return json({ reply: blocked }, { status: 200 }, cors);
             }
             const system = buildSystemPrompt(context);
-            const reply = await deepseekBuddyChat(env, system, messages);
-            return json({ reply: guardReply(reply, lastUser) }, { status: 200 }, cors);
+            return deepseekBuddyChatStream(env, system, messages, lastUser, cors);
           }
 
           case "/api/ai/recommend": {

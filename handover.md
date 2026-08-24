@@ -1,7 +1,7 @@
 # Anime Buddy — Handover
 
 **Date:** 2026-08-24  
-**App version:** `0.3.1` (see Profile → App version + `version.json` on Pages)  
+**App version:** `0.3.2` (see Profile → App version + `version.json` on Pages)  
 **Owner repo:** [megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy) (public)  
 **Live app:** [https://megabomb420.github.io/anime-buddy/](https://megabomb420.github.io/anime-buddy/)
 
@@ -42,7 +42,7 @@ Worker is **baked in** for Scan + Buddy. Profile can override; reset returns to 
 
 ## Versioning
 
-- `package.json` → semver shown in UI (`0.3.1`+)
+- `package.json` → semver shown in UI (`0.3.2`+)
 - CI injects `VITE_APP_VERSION`, `VITE_GIT_SHA` (7 chars), `VITE_BUILD_TIME`
 - Each Pages deploy writes `dist/version.json` `{ version, commit, builtAt }`
 - **Profile → App version** compares this install to `version.json` (no-store fetch)
@@ -90,6 +90,15 @@ Statuses: completed · watching · plan_to_watch · on_hold · dropped
 - Gibberish / noise blocked before AniList or DeepSeek
 - Max ~8 Library confirms / min
 - Cooldown ~25s after trip
+
+
+### DeepSeek (Buddy)
+
+- Model: `deepseek-v4-flash`
+- Chat: `thinking: { type: "enabled" }`, `reasoning_effort: high`, **streamed**
+- Reasoning tokens stay on the Worker; the PWA never shows the chain-of-thought
+- Rec / taste / signals: thinking **disabled** (JSON)
+- After `worker/src/**` changes: `cd worker && npx wrangler deploy`
 
 ### Persona lock layers
 
@@ -169,6 +178,7 @@ Persona / vision changes need a **Worker** redeploy, not only Pages.
 - [x] Library confirm flow via Ren + spam detector
 - [x] App version + latest check on Profile
 - [x] Buddy full-height chat (empty state fills the screen; composer above tab bar)
+- [x] Buddy types replies (SSE stream + typewriter); DeepSeek thinking on (`deepseek-v4-flash`)
 - [x] README + this handover
 
 ---
@@ -176,7 +186,7 @@ Persona / vision changes need a **Worker** redeploy, not only Pages.
 ## Verify after deploy
 
 1. Hard-refresh the live app (clear PWA cache if stuck).
-2. Profile → **App version** shows `v0.3.1` (or current) and *latest* or *update*.
+2. Profile → **App version** shows `v0.3.2` (or current) and *latest* or *update*.
 3. `curl -s https://megabomb420.github.io/anime-buddy/version.json`
 4. Buddy empty screen: prompt cards fill the view; composer sits on the tab bar (no black void).
 5. Buddy: `oglądałem Naruto` → confirm card → appears in Library.
