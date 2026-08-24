@@ -4,12 +4,21 @@ function reducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function pauseFor(ch: string): number {
-  if (/[.!?…]/.test(ch)) return 72;
-  if (/[,;:]/.test(ch)) return 36;
-  if (ch === "\n") return 48;
-  return 17;
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
+
+/** Per-character cadence. Slow enough that a short bubble is visibly typed. */
+export function pauseFor(ch: string): number {
+  if (/[.!?…]/.test(ch)) return 210;
+  if (/[,;:]/.test(ch)) return 120;
+  if (ch === "\n") return 170;
+  if (ch === " ") return 38;
+  return 44;
+}
+
+/** Dots stay up before a one-shot (JSON) reply starts typing. */
+const WINDUP_MS = 640;
 
 export async function typeOut(text: string, onTick: (shown: string) => void): Promise<void> {
   if (!text) {
@@ -20,17 +29,16 @@ export async function typeOut(text: string, onTick: (shown: string) => void): Pr
     onTick(text);
     return;
   }
+  await sleep(WINDUP_MS);
   let i = 0;
   while (i < text.length) {
-    const ch = text[i] ?? "";
-    const n = /[\s\n]/.test(ch) ? 1 : 2 + (i % 2 === 0 ? 1 : 0);
-    i = Math.min(text.length, i + n);
+    i += 1;
     onTick(text.slice(0, i));
-    await new Promise((r) => setTimeout(r, pauseFor(text[i - 1] ?? "")));
+    await sleep(pauseFor(text[i - 1] ?? ""));
   }
 }
 
-/** Type at a steady pace while chunks (stream or one-shot) arrive. */
+/** Type at a human pace while chunks (stream or one-shot) arrive. */
 export async function typeFromChunks(
   chunks: AsyncIterable<string>,
   onTick: (shown: string) => void,
@@ -59,13 +67,11 @@ export async function typeFromChunks(
 
   while (!done || shown.length < target.length) {
     if (shown.length < target.length) {
-      const left = target.length - shown.length;
-      const n = Math.min(left, left > 28 ? 4 : 2);
-      shown = target.slice(0, shown.length + n);
+      shown = target.slice(0, shown.length + 1);
       onTick(shown);
-      await new Promise((r) => setTimeout(r, pauseFor(shown[shown.length - 1] ?? "")));
+      await sleep(pauseFor(shown[shown.length - 1] ?? ""));
     } else {
-      await new Promise((r) => setTimeout(r, 28));
+      await sleep(40);
     }
   }
 

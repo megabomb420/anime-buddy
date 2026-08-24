@@ -249,8 +249,10 @@ export default function BuddyPage() {
         return;
       }
 
-      const picksPromise = catalogPicksFor(text);
       const tastePromise = persistence.getTasteProfile().catch(() => undefined);
+      const picksPromise = wantsRecommendation(text)
+        ? catalogPicksFor(text)
+        : Promise.resolve([] as RecPick[]);
       const [picks, taste] = await Promise.all([picksPromise, tastePromise]);
 
       let added = false;
