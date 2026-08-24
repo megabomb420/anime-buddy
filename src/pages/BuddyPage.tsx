@@ -23,7 +23,7 @@ import {
   rateDoneReply,
   ratePromptReply,
 } from "@/lib/buddy-library";
-import { parseLookupQuery } from "@/lib/catalog-search";
+import { parseBareTitleQuery, parseLookupQuery } from "@/lib/catalog-search";
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { animeTitle } from "@/lib/media";
 import { looksPolish } from "@/lib/buddy/persona";
@@ -336,7 +336,7 @@ export default function BuddyPage() {
         return;
       }
 
-      const lookup = parseLookupQuery(text);
+      const lookup = parseLookupQuery(text) ?? parseBareTitleQuery(text);
       if (lookup) {
         const candidates = await libraryCandidates(lookup);
         const reply = lookupReply(lookup, candidates.length, polish);
@@ -571,7 +571,7 @@ export default function BuddyPage() {
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="e.g. find spy x family · rate 9 AOT"
+            placeholder="e.g. spy x family · find Naruto"
             disabled={sending}
             autoComplete="off"
             enterKeyHint="send"
