@@ -26,14 +26,36 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      - name: Build metadata
+        run: |
+          echo "VITE_APP_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+          echo "VITE_GIT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          echo "VITE_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
       - run: npm run build
         env:
           GITHUB_PAGES: "true"
           VITE_WORKER_URL: "https://anime-buddy-worker.whip-blanket.workers.dev"
-      - name: SPA fallback for client routes
+          VITE_APP_VERSION: ${{ env.VITE_APP_VERSION }}
+          VITE_GIT_SHA: ${{ env.VITE_GIT_SHA }}
+          VITE_BUILD_TIME: ${{ env.VITE_BUILD_TIME }}
+      - name: SPA fallback + version.json
         run: |
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
+          node -e "
+            const fs = require('fs');
+            const meta = {
+              version: process.env.VITE_APP_VERSION || require('./package.json').version,
+              commit: process.env.VITE_GIT_SHA || '',
+              builtAt: process.env.VITE_BUILD_TIME || new Date().toISOString(),
+            };
+            fs.writeFileSync('dist/version.json', JSON.stringify(meta, null, 2) + '\n');
+            console.log('version.json', meta);
+          "
+        env:
+          VITE_APP_VERSION: ${{ env.VITE_APP_VERSION }}
+          VITE_GIT_SHA: ${{ env.VITE_GIT_SHA }}
+          VITE_BUILD_TIME: ${{ env.VITE_BUILD_TIME }}
       - uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
