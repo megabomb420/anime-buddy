@@ -1,4 +1,5 @@
 import type { AnimeSummary } from "@/types/anime";
+import { parseLibraryReadIntent } from "./buddy-library.ts";
 
 /**
  * Fold case, accents, and ×/x so "spy x family" matches "SPY×FAMILY".
@@ -112,6 +113,7 @@ export function parseBareTitleQuery(raw: string): string | null {
   if (text.length < 3 || text.length > 80) return null;
   if (/[?？]/.test(text)) return null;
   if (parseLookupQuery(text)) return null;
+  if (parseLibraryReadIntent(text)) return null;
   if (
     /pole[cć]|recommend|watch|tonight|wieczor|something |co ogl|co obej|surprise|zabawn|mroczn|daję|rate |episode |odcinek|skończy|oglądam|finished|watching|plan to|kto to|who is|tell me about|opowiedz|ile odcink|jaka ocena|score of|posta[cć]/i.test(
       text,

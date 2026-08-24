@@ -10,6 +10,11 @@ describe("parseCatalogAsk", () => {
     assert.equal(parseCatalogAsk("poleć coś mrocznego").kind, "rec");
   });
 
+  it("leaves library-read asks off the catalog path", () => {
+    assert.equal(parseCatalogAsk("what am I watching").kind, "none");
+    assert.equal(parseCatalogAsk("co oglądam").kind, "none");
+  });
+
   it("pulls a title out of factual questions", () => {
     const a = parseCatalogAsk("ile odcinków ma One Piece");
     assert.equal(a.kind, "lookup");

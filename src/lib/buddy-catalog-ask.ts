@@ -4,7 +4,7 @@
  */
 
 import { wantsRecommendation } from "./buddy-intent.ts";
-import { parseBuddyWriteIntent } from "./buddy-library.ts";
+import { parseBuddyWriteIntent, parseLibraryReadIntent } from "./buddy-library.ts";
 import { parseLookupQuery } from "./catalog-search.ts";
 import { animeTitle, anilistScore10, seasonLabel } from "./media.ts";
 import type { AnimeSummary } from "../types/anime.ts";
@@ -66,6 +66,7 @@ export function parseCatalogAsk(raw: string): CatalogAsk {
   const text = raw.trim();
   if (text.length < 2) return { kind: "none" };
   if (parseBuddyWriteIntent(text)) return { kind: "none" };
+  if (parseLibraryReadIntent(text)) return { kind: "none" };
   if (parseLookupQuery(text)) return { kind: "none" };
   if (wantsRecommendation(text)) return { kind: "rec" };
 

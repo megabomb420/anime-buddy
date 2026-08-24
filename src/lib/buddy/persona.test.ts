@@ -92,6 +92,17 @@ describe("buildSystemPrompt", () => {
     assert.match(p, /Frieren \(watching\)/);
     assert.match(p, /AniList is the catalog/);
   });
+
+  it("wires spoiler limits into the prompt", () => {
+    const p = buildSystemPrompt({
+      spoilerLevel: "strict",
+      spoilerLimits: [{ anilistId: 21, maxEpisodeSeen: 12, title: "One Piece" }],
+    });
+    assert.match(p, /SPOILER/);
+    assert.match(p, /strict/);
+    assert.match(p, /One Piece/);
+    assert.match(p, /ep 12|episode 12|odc\. 12|#21/i);
+  });
 });
 
 describe("mockBuddyReply", () => {

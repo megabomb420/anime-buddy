@@ -3,6 +3,8 @@ import type { LibraryStatus } from "@/types/entities";
 export interface LibraryIntent {
   status: LibraryStatus;
   query: string;
+  /** One or more titles from a batch log ("Naruto, Bleach and One Piece"). */
+  titles: string[];
   /** Episode number when the user reports progress. */
   progress?: number;
   /** Optional free-text reason (e.g. drop why). */
@@ -12,7 +14,14 @@ export interface LibraryIntent {
 export interface RateIntent {
   kind: "rate";
   query: string;
+  titles: string[];
   score: number;
+}
+
+export interface LibraryReadIntent {
+  kind: "library-read";
+  /** Missing = whole library. */
+  status?: LibraryStatus;
 }
 
 export type BuddyWriteIntent =
@@ -22,7 +31,7 @@ export type BuddyWriteIntent =
 const STATUS_PATTERNS: Array<{ status: LibraryStatus; re: RegExp }> = [
   {
     status: "completed",
-    re: /^(?:skończył[ae]?m|obejrzał[ae]?m|oglądał[ae]?m|przeszedł[ae]?m|dopatrzył[ae]?m|watched|finished|completed|i(?:'| a)?m done with)\s+(.+)$/i,
+    re: /^(?:skończył[ae]?m|obejrzał[ae]?m|oglądał[ae]?m|przeszedł[ae]?m|dopatrzył[ae]?m|(?:i\s+)?(?:watched|finished|completed)|i(?:'| a)?m done with)\s+(.+)$/i,
   },
   {
     status: "watching",
@@ -74,8 +83,40 @@ function statusFromWord(word: string): LibraryStatus {
 function cleanTitle(q: string): string {
   return q
     .replace(/[.!?]+$/, "")
-    .replace(/\s+(?:bo|because|boże|,)\s+.+$/i, "")
+    .replace(/\s+(?:bo|because|boże)\s+.+$/i, "")
     .trim();
+}
+
+const JOINER = /^(?:and|&|or|i|oraz|und)$/i;
+
+/**
+ * Split "AoT, Naruto, and One Piece" / "Frieren and Dungeon Meshi".
+ * Does not split on `;` so Steins;Gate stays one title.
+ */
+export function splitTitleList(raw: string): string[] {
+  const text = raw.trim();
+  if (!text) return [];
+
+  const commaChunks = text.split(/\s*,\s*/);
+  const chunks: string[] = [];
+  for (const c of commaChunks) {
+    chunks.push(...c.split(/\s+(?:and|&|oraz|und|i)\s+/i));
+  }
+
+  const titles: string[] = [];
+  for (const chunk of chunks) {
+    let part = chunk.trim();
+    part = part.replace(/^(?:and|&|or|i|oraz|und)\s+/i, "").replace(/[.!?]+$/g, "").trim();
+    if (!part || JOINER.test(part) || part.length < 2) continue;
+    if (!titles.some((t) => t.toLowerCase() === part.toLowerCase())) titles.push(part);
+    if (titles.length >= 6) break;
+  }
+  return titles.length ? titles : [text.replace(/[.!?]+$/, "").trim()].filter((t) => t.length >= 2);
+}
+
+function withTitles<T extends { query: string }>(intent: T, split: boolean): T & { titles: string[] } {
+  const titles = split ? splitTitleList(intent.query) : [intent.query];
+  return { ...intent, query: titles[0] ?? intent.query, titles };
 }
 
 function parseScore(raw: string): number | null {
@@ -110,7 +151,7 @@ export function parseProgressIntent(raw: string): LibraryIntent | null {
     if (!Number.isFinite(ep) || ep < 1 || ep > 5000) continue;
     const query = cleanTitle(title);
     if (query.length < 2) continue;
-    return { status: "watching", query, progress: ep };
+    return { status: "watching", query, titles: [query], progress: ep };
   }
   return null;
 }
@@ -133,7 +174,7 @@ export function parseRateIntent(raw: string): RateIntent | null {
     if (score == null) continue;
     const query = cleanTitle(title);
     if (query.length < 2) continue;
-    return { kind: "rate", query, score };
+    return withTitles({ kind: "rate" as const, query, score }, true);
   }
   return null;
 }
@@ -147,7 +188,8 @@ export function parseLibraryIntent(raw: string): LibraryIntent | null {
 
   const mark = text.match(MARK_AS);
   if (mark?.[1] && mark[2]) {
-    return { status: statusFromWord(mark[2]), query: cleanTitle(mark[1]) };
+    const query = cleanTitle(mark[1]);
+    return withTitles({ status: statusFromWord(mark[2]), query }, true);
   }
 
   for (const { status, re } of STATUS_PATTERNS) {
@@ -155,12 +197,35 @@ export function parseLibraryIntent(raw: string): LibraryIntent | null {
     if (m?.[1]) {
       if (status === "dropped") {
         const { query, reason } = splitDropReason(m[1]);
-        if (query.length >= 2) return { status, query, reason };
+        if (query.length >= 2) return withTitles({ status, query, reason }, true);
       } else {
         const query = cleanTitle(m[1]);
-        if (query.length >= 2) return { status, query };
+        if (query.length >= 2) return withTitles({ status, query }, true);
       }
     }
+  }
+  return null;
+}
+
+const LIBRARY_READ: Array<{ status?: LibraryStatus; re: RegExp }> = [
+  { status: "watching", re: /^(?:what(?:'s| is)?(?: on)?(?: my)? watching|what am i watching|co (?:aktualnie )?oglądam|moje oglądane)\s*[?.!]*$/i },
+  { status: "completed", re: /^(?:what have i (?:finished|completed|watched)|co (?:skończył[ae]?m|obejrzał[ae]?m)|my completed)\s*[?.!]*$/i },
+  { status: "plan_to_watch", re: /^(?:what(?:'s| is) (?:on )?my (?:plan|watchlist|plan to watch)|co planuję|moja (?:watchlista|lista życzeń))\s*[?.!]*$/i },
+  { status: "dropped", re: /^(?:what (?:did i )?drop(?:ped)?|co rzucił[ae]?m|moje rzucone)\s*[?.!]*$/i },
+  { status: "on_hold", re: /^(?:what(?:'s| is) on hold|co (?:mam )?wstrzymane)\s*[?.!]*$/i },
+  {
+    status: undefined,
+    re: /^(?:what(?:'s| is) in my (?:library|list)|my library|my list|show my library|co mam w bibliotece|moja biblioteka|moja lista)\s*[?.!]*$/i,
+  },
+];
+
+/** "what am I watching" — IndexedDB read, no DeepSeek, no catalog invent. */
+export function parseLibraryReadIntent(raw: string): LibraryReadIntent | null {
+  const text = raw.trim();
+  if (text.length < 4) return null;
+  if (parseLibraryIntent(text) || parseRateIntent(text)) return null;
+  for (const { status, re } of LIBRARY_READ) {
+    if (re.test(text)) return { kind: "library-read", status };
   }
   return null;
 }
@@ -229,6 +294,48 @@ export function libraryPromptReply(
   return polish
     ? `Kilka trafień. Które dokładnie? Zatwierdź kartę — zapiszę jako ${label}${prog}.`
     : `A few matches. Which exact title? Confirm a card — I'll mark it ${label}${prog}.`;
+}
+
+export function libraryBatchPromptReply(
+  status: LibraryStatus,
+  found: number,
+  asked: number,
+  polish: boolean,
+): string {
+  const label = libraryStatusLabel(status, polish);
+  if (found === 0) {
+    return polish
+      ? "Nie znalazłem tych tytułów w katalogu. Podaj dokładniej."
+      : "None of those matched the catalog. Give me clearer titles.";
+  }
+  if (asked === 1) return libraryPromptReply(status, found, polish);
+  return polish
+    ? `${found} z ${asked} — zatwierdź każdą kartę, zapiszę jako ${label}.`
+    : `${found} of ${asked} — confirm each card and I'll mark them ${label}.`;
+}
+
+export function libraryReadReply(
+  status: LibraryStatus | undefined,
+  count: number,
+  polish: boolean,
+): string {
+  const label = status ? libraryStatusLabel(status, polish) : polish ? "bibliotece" : "library";
+  if (count === 0) {
+    return polish
+      ? status
+        ? `Pusto na „${label}”.`
+        : "Biblioteka pusta."
+      : status
+        ? `Nothing in ${label} yet.`
+        : "Library is empty.";
+  }
+  return polish
+    ? status
+      ? `To jest na „${label}” (${count}):`
+      : `Twoja biblioteka (${count}):`
+    : status
+      ? `On ${label} (${count}):`
+      : `Your library (${count}):`;
 }
 
 export function libraryDoneReply(

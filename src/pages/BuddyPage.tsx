@@ -17,9 +17,13 @@ import { RecPickCard, recPickFromAnime, type RecPick } from "@/components/anime/
 import { LibraryConfirmCard } from "@/components/anime/LibraryConfirmCard";
 import { BUDDY_CHIPS, interpretBuddyQuery, wantsRecommendation } from "@/lib/buddy-intent";
 import {
+  libraryBatchPromptReply,
   libraryDoneReply,
   libraryPromptReply,
+  libraryReadReply,
+  libraryStatusLabel,
   parseBuddyWriteIntent,
+  parseLibraryReadIntent,
   rateDoneReply,
   ratePromptReply,
 } from "@/lib/buddy-library";
@@ -74,6 +78,8 @@ const LOG_PREFIXES = [
   { label: "Rate…", prefix: "rate " },
 ];
 
+const LIBRARY_CHIPS = [{ label: "What am I watching?", query: "what am I watching" }];
+
 async function catalogPicksFor(text: string): Promise<{ picks: RecPick[]; factsText: string }> {
   if (!wantsRecommendation(text)) return { picks: [], factsText: "" };
   const prompt = interpretBuddyQuery(text);
@@ -96,12 +102,18 @@ async function catalogPicksFor(text: string): Promise<{ picks: RecPick[]; factsT
   return { picks, factsText: factsFromPicks(animes).factsText };
 }
 
-async function libraryCandidates(query: string): Promise<RecPick[]> {
-  const results = await animeCatalogService.search(query, 6);
+async function libraryCandidates(query: string, limit = 6): Promise<RecPick[]> {
+  const results = await animeCatalogService.search(query, limit);
   return results.map((a) => recPickFromAnime(a));
 }
 
-function mergePicks(primary: RecPick[], extra: RecPick[]): RecPick[] {
+async function libraryCandidatesForTitles(titles: string[]): Promise<RecPick[]> {
+  const per = titles.length > 1 ? 2 : 6;
+  const groups = await Promise.all(titles.slice(0, 6).map((t) => libraryCandidates(t, per)));
+  return mergePicks(groups.flat(), [], titles.length > 1 ? 12 : 6);
+}
+
+function mergePicks(primary: RecPick[], extra: RecPick[], limit = 4): RecPick[] {
   const out: RecPick[] = [];
   const seen = new Set<number>();
   for (const p of [...primary, ...extra]) {
@@ -109,7 +121,7 @@ function mergePicks(primary: RecPick[], extra: RecPick[]): RecPick[] {
     seen.add(p.anilistId);
     out.push(p);
   }
-  return out.slice(0, 4);
+  return out.slice(0, limit);
 }
 
 function lookupReply(query: string, count: number, polish: boolean): string {
@@ -315,8 +327,12 @@ export default function BuddyPage() {
 
       const write = parseBuddyWriteIntent(text);
       if (write?.kind === "library") {
-        const candidates = await libraryCandidates(write.query);
-        const reply = libraryPromptReply(write.status, candidates.length, polish, write.progress);
+        const titles = write.titles.length ? write.titles : [write.query];
+        const candidates = await libraryCandidatesForTitles(titles);
+        const reply =
+          titles.length > 1
+            ? libraryBatchPromptReply(write.status, candidates.length, titles.length, polish)
+            : libraryPromptReply(write.status, candidates.length, polish, write.progress);
         await memoryService.appendMessage(convo.id, "assistant", reply);
         await revealAssistant(
           {
@@ -338,7 +354,8 @@ export default function BuddyPage() {
       }
 
       if (write?.kind === "rate") {
-        const candidates = await libraryCandidates(write.query);
+        const titles = write.titles.length ? write.titles : [write.query];
+        const candidates = await libraryCandidatesForTitles(titles);
         const reply = ratePromptReply(write.score, candidates.length, polish);
         await memoryService.appendMessage(convo.id, "assistant", reply);
         await revealAssistant(
@@ -347,6 +364,31 @@ export default function BuddyPage() {
             polish,
             rateConfirm:
               candidates.length > 0 ? { score: write.score, picks: candidates } : undefined,
+          },
+          reply,
+        );
+        return;
+      }
+
+      const libraryRead = parseLibraryReadIntent(text);
+      if (libraryRead) {
+        const entries = await persistence.getLibrary(libraryRead.status);
+        const picks: RecPick[] = [];
+        for (const e of entries.slice(0, 20)) {
+          const anime =
+            (await persistence.getCachedAnime(e.anilistId)) ??
+            (await animeCatalogService.getAnime(e.anilistId));
+          if (anime) {
+            picks.push(recPickFromAnime(anime, libraryStatusLabel(e.status, polish)));
+          }
+        }
+        const reply = libraryReadReply(libraryRead.status, picks.length, polish);
+        await memoryService.appendMessage(convo.id, "assistant", reply);
+        await revealAssistant(
+          {
+            role: "assistant",
+            polish,
+            picks: picks.length ? picks : undefined,
           },
           reply,
         );
@@ -375,7 +417,15 @@ export default function BuddyPage() {
         : Promise.resolve({ picks: [] as RecPick[], factsText: "" });
       const catalogPromise = resolveBuddyCatalog(text);
       const tastePromise = persistence.getTasteProfile().catch(() => undefined);
-      const [rec, catalog, taste] = await Promise.all([recPromise, catalogPromise, tastePromise]);
+      const settingsPromise = persistence.getSettings().catch(() => undefined);
+      const spoilerPromise = persistence.getSpoilerLimits().catch(() => []);
+      const [rec, catalog, taste, settings, spoilerLimits] = await Promise.all([
+        recPromise,
+        catalogPromise,
+        tastePromise,
+        settingsPromise,
+        spoilerPromise,
+      ]);
 
       const picks = rec.picks.length ? rec.picks : catalog.animes.map((a) => recPickFromAnime(a));
       const factsText = rec.factsText || catalog.factsText;
@@ -407,6 +457,8 @@ export default function BuddyPage() {
           catalogFacts: factsText || undefined,
           libraryBrief: catalog.libraryBrief || undefined,
           tasteSummary: taste?.summary,
+          spoilerLevel: settings?.spoilerLevel ?? "normal",
+          spoilerLimits: spoilerLimits.length ? spoilerLimits : undefined,
         },
         onDelta,
         (extra) => {
@@ -518,6 +570,19 @@ export default function BuddyPage() {
                     className="h-9 rounded-full"
                     disabled={sending}
                     onClick={() => applyPrefix(item.prefix)}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+                {LIBRARY_CHIPS.map((item) => (
+                  <Button
+                    key={item.label}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-full"
+                    disabled={sending}
+                    onClick={() => void send(item.query)}
                   >
                     {item.label}
                   </Button>

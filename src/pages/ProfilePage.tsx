@@ -23,7 +23,12 @@ import { VisionGatewayCard } from "@/components/VisionGatewayCard";
 import { persistence } from "@/lib/db/persistence";
 import { db } from "@/lib/db/database";
 import { tasteService } from "@/lib/services/TasteService";
-import type { ContentVisibility, Settings as SettingsType, TasteProfile } from "@/types/entities";
+import type {
+  ContentVisibility,
+  Settings as SettingsType,
+  SpoilerLevel,
+  TasteProfile,
+} from "@/types/entities";
 import { APP_BUILT_AT, APP_COMMIT, APP_VERSION, checkForUpdate } from "@/lib/app-version";
 import type { VersionCheck } from "@/lib/app-version";
 
@@ -47,6 +52,7 @@ export default function ProfilePage() {
   const [ratingDistribution, setRatingDistribution] = useState<Record<number, number>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [versionCheck, setVersionCheck] = useState<VersionCheck | null>(null);
+  const [rebuildingTaste, setRebuildingTaste] = useState(false);
 
   useEffect(() => {
     void checkForUpdate().then(setVersionCheck);
@@ -113,6 +119,10 @@ export default function ProfilePage() {
     setSettings(await persistence.updateSettings({ contentVisibility: value }));
   }
 
+  async function setSpoilerLevel(value: SpoilerLevel) {
+    setSettings(await persistence.updateSettings({ spoilerLevel: value }));
+  }
+
   async function exportData() {
     const dump = await persistence.exportAll();
     const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
@@ -137,8 +147,14 @@ export default function ProfilePage() {
   }
 
   async function rebuildTaste() {
-    await tasteService.rebuildTasteProfile(false);
-    setTaste(await persistence.getTasteProfile());
+    if (rebuildingTaste) return;
+    setRebuildingTaste(true);
+    try {
+      await tasteService.rebuildTasteProfile(true);
+      setTaste(await persistence.getTasteProfile());
+    } finally {
+      setRebuildingTaste(false);
+    }
   }
 
   if (!settings) return null;
@@ -188,8 +204,14 @@ export default function ProfilePage() {
           <h2 className="font-medium flex items-center gap-2">
             <Star className="h-4 w-4" /> Taste DNA
           </h2>
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={rebuildTaste}>
-            Rebuild
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs"
+            disabled={rebuildingTaste}
+            onClick={() => void rebuildTaste()}
+          >
+            {rebuildingTaste ? "Asking DeepSeek…" : "Rebuild"}
           </Button>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
@@ -198,7 +220,7 @@ export default function ProfilePage() {
           ) : (
             <p className="text-sm text-muted-foreground">
               {Object.keys(taste?.stats ?? {}).length > 0
-                ? `${Object.keys(taste!.stats).length} taste signals recorded.`
+                ? `${Object.keys(taste!.stats).length} taste signals recorded. Rebuild writes a Taste DNA blurb via the Worker.`
                 : "No taste data yet — rate anime, pick favorites, or talk to Buddy."}
             </p>
           )}
@@ -275,6 +297,31 @@ export default function ProfilePage() {
           <p className="text-xs text-muted-foreground">
             Region: {settings.region} · Age guides show their source; MAL-derived labels are never
             presented as official Irish classifications.
+          </p>
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-medium flex items-center gap-2">
+          <Settings className="h-4 w-4" /> Spoilers
+        </h2>
+        <div className="space-y-2">
+          <Label htmlFor="spoilers">How Ren talks about plot</Label>
+          <Select
+            value={settings.spoilerLevel ?? "normal"}
+            onValueChange={(v) => void setSpoilerLevel(v as SpoilerLevel)}
+          >
+            <SelectTrigger id="spoilers">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="strict">Strict — no plot past your episode</SelectItem>
+              <SelectItem value="normal">Normal — no twists or endings</SelectItem>
+              <SelectItem value="off">Off — no extra lock</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Caps come from Library progress. Ren still never invents plot.
           </p>
         </div>
       </section>

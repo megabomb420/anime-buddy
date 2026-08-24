@@ -70,13 +70,23 @@ export class TasteService {
       const titles = await Promise.all(
         ratings.slice(0, 50).map(async (r) => {
           const anime = await persistence.getCachedAnime(r.anilistId);
-          return { anilistId: r.anilistId, title: anime?.title.romaji ?? `#${r.anilistId}`, score: r.score };
+          return {
+            anilistId: r.anilistId,
+            title: anime?.title.english ?? anime?.title.romaji ?? `#${r.anilistId}`,
+            score: r.score,
+          };
+        }),
+      );
+      const favoriteTitles = await Promise.all(
+        favorites.slice(0, 20).map(async (f) => {
+          const anime = await persistence.getCachedAnime(f.anilistId);
+          return anime?.title.english ?? anime?.title.romaji ?? `#${f.anilistId}`;
         }),
       );
       try {
         summary = await providers.ai.analyzeTaste({
           ratings: titles,
-          favorites: favorites.map((f) => String(f.anilistId)),
+          favorites: favoriteTitles,
           notes: [],
         });
       } catch {

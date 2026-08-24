@@ -23,6 +23,8 @@ export interface UserProfile {
 
 export type ContentVisibility = "show_all" | "hide_18_plus" | "family";
 
+export type SpoilerLevel = "strict" | "normal" | "off";
+
 export interface Settings {
   /** Singleton id, always "main" in v1. */
   id: string;
@@ -31,6 +33,8 @@ export interface Settings {
   contentVisibility: ContentVisibility;
   /** Family profile: hide anything above this age. */
   maxAge?: number;
+  /** How Ren talks about plot. Default "normal". */
+  spoilerLevel?: SpoilerLevel;
   onboardingCompleted: boolean;
   updatedAt: number;
 }

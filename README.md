@@ -1,6 +1,6 @@
 # Anime Buddy
 
-**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.11**
+**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.12**
 
 **Source:** [github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
 
@@ -18,8 +18,8 @@ UI chrome is **English**. Ren still answers Polish in Polish.
 | **Discover** | Live search from 2 letters (covers). Trending / Seasonal / Popular. iOS safe-area header. |
 | **Scan** | Camera or photo of a figurine / character art → AniList match |
 | **Library** | Watching, want to watch, completed. Same safe-area as Discover. |
-| **Buddy** | Full-height chat with Ren. He looks titles up on **AniList** (episodes, score, studio, characters) and drops tappable covers. `I finished Attack on Titan…` → confirm. `znajdź Spy x Family` → catalog cards. Replies type out. |
-| **Profile** | Taste, age gate, Worker override, data export. |
+| **Buddy** | Full-height chat with Ren. He looks titles up on **AniList** (episodes, score, studio, characters) and drops tappable covers. `I finished Attack on Titan…` → confirm. `I finished Naruto, Bleach and One Piece` → one confirm per title. `what am I watching` → your Library (no DeepSeek). `znajdź Spy x Family` → catalog cards. Replies type out. |
+| **Profile** | Taste DNA (Worker blurb on Rebuild), spoiler level, age gate, Worker override, data export. |
 
 Catalog is **AniList**. Scores may also show Jikan (MAL). AI never invents titles, scores, or streaming facts.
 

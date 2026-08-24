@@ -1,6 +1,8 @@
 export interface BuddyContext {
   tasteSummary?: string;
   characterSummary?: string;
+  spoilerLevel?: "strict" | "normal" | "off";
+  spoilerLimits?: Array<{ anilistId: number; maxEpisodeSeen: number; title?: string }>;
   catalogPicks?: Array<{ title: string; genres: string[]; anilistId?: number; coverImage?: string }>;
   catalogFacts?: string;
   libraryBrief?: string;
@@ -133,6 +135,27 @@ export function guardReply(text: string, userText: string): string {
   return trimmed;
 }
 
+function spoilerPrompt(context?: BuddyContext): string {
+  const level = context?.spoilerLevel ?? "normal";
+  if (level === "off") {
+    return "SPOILER lock is off. Still never invent plot that is not in catalog facts.";
+  }
+  const lines = (context?.spoilerLimits ?? [])
+    .slice(0, 20)
+    .map((s) => `- ${s.title ?? `#${s.anilistId}`}: seen through ep ${s.maxEpisodeSeen}`)
+    .join("\n");
+  return [
+    `SPOILER lock: ${level}. Do not spoil plot, twists, deaths, endings, or episode events past the user's seen episode.`,
+    level === "strict"
+      ? "Strict: no episode-specific plot at all past the cap. If they ask what happens next, refuse and stay vague."
+      : "Normal: no major twists or endings past the cap. Light recap of seen episodes is ok.",
+    lines
+      ? `Progress caps (AniList):\n${lines}`
+      : "No progress caps listed — treat titles as unseen. Do not spoil endings.",
+    "If a title is not in the cap list, treat it as unseen.",
+  ].join("\n");
+}
+
 export function buildSystemPrompt(context?: BuddyContext): string {
   const picks = context?.catalogPicks ?? [];
   const pickLines = picks
@@ -158,6 +181,7 @@ export function buildSystemPrompt(context?: BuddyContext): string {
     context?.libraryBrief
       ? `Their library (don't pitch these as unseen unless they ask): ${context.libraryBrief.slice(0, 500)}`
       : "",
+    spoilerPrompt(context),
     context?.tasteSummary ? `Taste notes (may be incomplete): ${context.tasteSummary.slice(0, 400)}` : "",
     context?.characterSummary ? `Character notes: ${context.characterSummary.slice(0, 240)}` : "",
     "If they ask who you are: you're Ren. Buddy's the nickname. That's the whole job.",

@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseLibraryIntent } from "./buddy-library.ts";
+import {
+  parseLibraryIntent,
+  parseLibraryReadIntent,
+  parseRateIntent,
+  splitTitleList,
+} from "./buddy-library.ts";
 
 describe("parseLibraryIntent", () => {
   it("parses Polish completed watch", () => {
@@ -8,6 +13,7 @@ describe("parseLibraryIntent", () => {
     assert.ok(intent);
     assert.equal(intent?.status, "completed");
     assert.match(intent?.query ?? "", /Attack on Titan/i);
+    assert.deepEqual(intent?.titles, ["Attack on Titan"]);
   });
 
   it("parses English watching", () => {
@@ -21,10 +27,63 @@ describe("parseLibraryIntent", () => {
     const intent = parseLibraryIntent("chcę obejrzeć Steins;Gate");
     assert.ok(intent);
     assert.equal(intent?.status, "plan_to_watch");
+    assert.deepEqual(intent?.titles, ["Steins;Gate"]);
   });
 
   it("ignores rec asks", () => {
     assert.equal(parseLibraryIntent("co oglądać wieczorem"), null);
     assert.equal(parseLibraryIntent("Something funny"), null);
+  });
+
+  it("splits a comma list into confirm titles", () => {
+    const intent = parseLibraryIntent("I finished Attack on Titan, Naruto, and One Piece");
+    assert.ok(intent);
+    assert.equal(intent?.status, "completed");
+    assert.deepEqual(intent?.titles, ["Attack on Titan", "Naruto", "One Piece"]);
+  });
+
+  it("splits Polish i-lists without breaking Steins;Gate", () => {
+    const intent = parseLibraryIntent("oglądam Naruto, Bleach i One Piece");
+    assert.equal(intent?.status, "watching");
+    assert.deepEqual(intent?.titles, ["Naruto", "Bleach", "One Piece"]);
+  });
+});
+
+describe("splitTitleList", () => {
+  it("keeps a single title with a semicolon", () => {
+    assert.deepEqual(splitTitleList("Steins;Gate"), ["Steins;Gate"]);
+  });
+
+  it("splits and-lists", () => {
+    assert.deepEqual(splitTitleList("Frieren and Dungeon Meshi"), ["Frieren", "Dungeon Meshi"]);
+  });
+});
+
+describe("parseRateIntent", () => {
+  it("splits scored titles", () => {
+    const intent = parseRateIntent("rate 9 Naruto and Bleach");
+    assert.ok(intent);
+    assert.equal(intent?.score, 9);
+    assert.deepEqual(intent?.titles, ["Naruto", "Bleach"]);
+  });
+});
+
+describe("parseLibraryReadIntent", () => {
+  it("reads watching without going to catalog search", () => {
+    const intent = parseLibraryReadIntent("what am I watching");
+    assert.equal(intent?.status, "watching");
+    assert.equal(parseLibraryReadIntent("co oglądam")?.status, "watching");
+  });
+
+  it("reads the whole library", () => {
+    assert.equal(parseLibraryReadIntent("what's in my library")?.status, undefined);
+    assert.equal(parseLibraryReadIntent("co mam w bibliotece")?.status, undefined);
+  });
+
+  it("does not steal writes or recs", () => {
+    assert.equal(parseLibraryReadIntent("I'm watching Naruto"), null);
+    assert.equal(parseLibraryReadIntent("oglądam One Piece"), null);
+    assert.equal(parseLibraryReadIntent("co oglądać wieczorem"), null);
+    assert.equal(parseLibraryReadIntent("what should I watch"), null);
   });
 });

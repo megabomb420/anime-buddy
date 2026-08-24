@@ -1,7 +1,7 @@
 # Anime Buddy — Handover
 
 **Date:** 2026-08-24  
-**App version:** `0.3.11`  
+**App version:** `0.3.12`  
 **Live:** https://megabomb420.github.io/anime-buddy/  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev
 
@@ -72,9 +72,10 @@ Expect:
 | 3 | **After X / similar** → catalog similar recs | **Shipped 0.3.8** |
 | 4 | **Natural time budget** → tonight-style query | **Shipped 0.3.8** |
 | 5 | **Drop + reason** → dropped + free-text taste signal | **Shipped 0.3.8** |
-| 6 | Batch multi-title log in one message | Next |
-| 7 | Taste DNA blurb (Worker `analyzeTaste` on Profile rebuild) | Next |
-| 8 | Spoiler level (settings + prompt) | Next |
+| 6 | Batch multi-title log in one message | **Shipped 0.3.12** |
+| 7 | Taste DNA blurb (Worker `analyzeTaste` on Profile rebuild) | **Shipped 0.3.12** |
+| 8 | Spoiler level (settings + prompt) | **Shipped 0.3.12** |
+| — | Library queries from chat (`what am I watching`) | **Shipped 0.3.12** |
 | 9 | Session summary every N turns (token save) | Later |
 | 10 | Compare two catalog titles side by side | Later |
 | — | **AniList facts in chat** (PWA pre-fetch) | **Shipped 0.3.11** |
@@ -93,6 +94,8 @@ Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 - `kto to Lelouch` → character + their anime from AniList
 - `what's trending` / `ten sezon` → live list + covers
 - `znajdź Spy x Family` / bare `spy x family` → catalog cards (no DeepSeek)
+- `I finished Naruto, Bleach and One Piece` → confirm cards per title (no DeepSeek)
+- `what am I watching` / `co oglądam` → IndexedDB library cards (no DeepSeek)
 
 Ren does **not** invent catalog facts. The PWA looks titles up (`src/lib/buddy-catalog.ts`) and stuffs compact facts into the prompt. Worker tools cover turns with no client facts.
 
@@ -100,7 +103,7 @@ Ren does **not** invent catalog facts. The PWA looks titles up (`src/lib/buddy-c
 
 ## If “nothing changed” on the phone
 
-1. Home footer must show **`v0.3.11`** (or newer).  
+1. Home footer must show **`v0.3.12`** (or newer).  
 2. Else clear site data for `megabomb420.github.io` (stale PWA SW).  
 3. `curl -s https://megabomb420.github.io/anime-buddy/version.json`
 
@@ -112,9 +115,10 @@ Local-first PWA: Discover, Library, Scan (vision), **Ren** chat. IndexedDB only.
 
 ### Ren router (0.3.11+)
 
-1. **Write** — library / rate / progress → Confirm cards (no DeepSeek)  
-2. **Lookup** — `znajdź` / bare title → catalog cards (no DeepSeek)  
-3. **Chat + facts** — rec / episodes / cast / trending → PWA facts + DeepSeek stream  
+1. **Write** — library / rate / progress (including comma/`and`/`i` lists) → Confirm cards (no DeepSeek)  
+2. **Library read** — `what am I watching` / `co oglądam` / `my library` → IndexedDB cards (no DeepSeek)  
+3. **Lookup** — `znajdź` / bare title → catalog cards (no DeepSeek)  
+4. **Chat + facts** — rec / episodes / cast / trending → PWA facts + DeepSeek stream + spoiler caps  
 
 Persona lock client + Worker. Spam guard client-side.
 

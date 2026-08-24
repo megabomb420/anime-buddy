@@ -134,22 +134,54 @@ export const persistence = {
     progress = 0,
   ): Promise<LibraryEntry> {
     const existing = await db.libraryEntries.get(anilistId);
+    const nextProgress = progress > 0 ? progress : (existing?.progress ?? 0);
     const entry: LibraryEntry = {
       anilistId,
       status,
-      progress: existing?.progress ?? progress,
+      progress: nextProgress,
       startedAt:
         existing?.startedAt ?? (status === "watching" || status === "completed" ? now() : undefined),
       completedAt: status === "completed" ? now() : existing?.completedAt,
       updatedAt: now(),
     };
     await db.libraryEntries.put(entry);
+    if (progress > 0) await this.setProgress(anilistId, progress);
     return entry;
   },
 
   async getLibrary(status?: LibraryStatus): Promise<LibraryEntry[]> {
     if (status) return db.libraryEntries.where("status").equals(status).toArray();
     return db.libraryEntries.toArray();
+  }
+
+  /** Episode caps for Ren's spoiler lock (library progress ∪ spoilerStates ∪ viewingProgress). */
+  async getSpoilerLimits(): Promise<
+    Array<{ anilistId: number; maxEpisodeSeen: number; title?: string }>
+  > {
+    const [states, library, progress] = await Promise.all([
+      db.spoilerStates.toArray(),
+      db.libraryEntries.toArray(),
+      db.viewingProgress.toArray(),
+    ]);
+    const map = new Map<number, number>();
+    const bump = (id: number, ep: number) => {
+      if (!Number.isFinite(ep) || ep < 1) return;
+      map.set(id, Math.max(map.get(id) ?? 0, ep));
+    };
+    for (const s of states) bump(s.anilistId, s.maxEpisodeSeen);
+    for (const e of library) bump(e.anilistId, e.progress);
+    for (const p of progress) bump(p.anilistId, p.episode);
+
+    const out: Array<{ anilistId: number; maxEpisodeSeen: number; title?: string }> = [];
+    for (const [anilistId, maxEpisodeSeen] of map) {
+      const cached = await this.getCachedAnime(anilistId);
+      out.push({
+        anilistId,
+        maxEpisodeSeen,
+        title: cached?.title.english ?? cached?.title.romaji,
+      });
+    }
+    return out.slice(0, 30);
   },
 
   async removeLibraryEntry(anilistId: number): Promise<void> {

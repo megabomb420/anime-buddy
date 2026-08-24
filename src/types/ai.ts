@@ -21,7 +21,8 @@ export interface ChatMessage {
 export interface BuddyContext {
   tasteSummary?: string;
   characterSummary?: string;
-  spoilerLimits?: Array<{ anilistId: number; maxEpisodeSeen: number }>;
+  spoilerLevel?: "strict" | "normal" | "off";
+  spoilerLimits?: Array<{ anilistId: number; maxEpisodeSeen: number; title?: string }>;
   region?: string;
   /** Titles already resolved from the catalog — Buddy must not invent others. */
   catalogPicks?: Array<{
