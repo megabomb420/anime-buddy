@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   Camera,
@@ -30,6 +30,10 @@ const TONIGHT_OPTIONS = [
   { label: "3 hours", minutes: 180 },
   { label: "All night", minutes: 9999 },
 ];
+
+/** How often Featured cycles through the trending pool. */
+const FEATURED_ROTATE_MS = 45_000;
+const FEATURED_POOL_SIZE = 8;
 
 function RecommendationCard({
   rec,
@@ -112,9 +116,18 @@ export default function HomePage() {
   const [continueWatching, setContinueWatching] = useState<Array<{ anime: AnimeSummary; progress: number }>>([]);
   const [loadingTonight, setLoadingTonight] = useState(false);
   const [selectedMinutes, setSelectedMinutes] = useState<number | null>(null);
-  const [hero, setHero] = useState<AnimeSummary | null>(null);
   const [trending, setTrending] = useState<AnimeSummary[]>([]);
+  const [heroIndex, setHeroIndex] = useState(0);
   const [catalogLoading, setCatalogLoading] = useState(true);
+
+  const featuredPool = useMemo(
+    () => trending.slice(0, FEATURED_POOL_SIZE),
+    [trending],
+  );
+  const hero =
+    featuredPool.length > 0
+      ? featuredPool[heroIndex % featuredPool.length] ?? null
+      : null;
 
   useEffect(() => {
     void (async () => {
@@ -132,7 +145,7 @@ export default function HomePage() {
       });
       setOnboardingDone(settings.onboardingCompleted);
       setTrending(trend);
-      setHero(trend[0] ?? null);
+      setHeroIndex(0);
       setCatalogLoading(false);
 
       const watching = library.filter((e) => e.status === "watching");
@@ -144,6 +157,40 @@ export default function HomePage() {
       setContinueWatching(cw);
     })();
   }, []);
+
+  useEffect(() => {
+    if (featuredPool.length < 2) return;
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let timer: number | undefined;
+
+    const clear = () => {
+      if (timer !== undefined) {
+        window.clearInterval(timer);
+        timer = undefined;
+      }
+    };
+
+    const start = () => {
+      clear();
+      timer = window.setInterval(() => {
+        setHeroIndex((i) => (i + 1) % featuredPool.length);
+      }, FEATURED_ROTATE_MS);
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) clear();
+      else start();
+    };
+
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clear();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [featuredPool.length]);
 
   async function loadTonight(minutes: number) {
     setSelectedMinutes(minutes);
@@ -194,7 +241,11 @@ export default function HomePage() {
 
   return (
     <div className="pb-8">
-      {catalogLoading ? <HeroSkeleton /> : hero ? <FeaturedHero anime={hero} /> : null}
+      {catalogLoading ? (
+        <HeroSkeleton />
+      ) : hero ? (
+        <FeaturedHero key={hero.anilistId} anime={hero} />
+      ) : null}
 
       <section className="mt-8">
         <SectionHeader title="Trending now" kicker="Live catalog" href="/discover" />
