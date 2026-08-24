@@ -54,7 +54,7 @@ If the phone still looks old after a deploy: clear site data for `megabomb420.gi
 
 ## Docs
 
-- **[handover.md](./handover.md)** — architecture, persona lock, versioning, deploy, what to verify. Read this before changing the product.
+- **[handover.md](./handover.md)** — full agent brief: architecture, Ren router, live status, traps, next work. Read before changing the product.
 - [worker/README.md](./worker/README.md) — Worker dashboard setup
 
 Keep **README + handover** in the same commit when behavior changes.
