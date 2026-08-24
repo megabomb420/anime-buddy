@@ -48,7 +48,7 @@ GitHub Pages build:
 GITHUB_PAGES=true npm run build
 ```
 
-Push to `main` publishes the PWA. Worker is a **separate** deploy (`cd worker && npx wrangler deploy`).
+Push to `main` publishes the PWA. Worker is a **separate** deploy (`cd worker && npx wrangler deploy`). Live Worker health: `chat:"sse"`, `thinking:true`, `tools:true`. GitHub Actions Worker deploy still needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`.
 
 If the phone still looks old after a deploy: clear site data for `megabomb420.github.io` (PWA service worker) and check the Home footer version.
 

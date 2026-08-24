@@ -9,30 +9,29 @@
 
 ---
 
-## Worker status (priority #1)
+## Worker status (priority #1 — live as of 2026-08-24)
 
 | | Source (`main`) | Live Worker |
 | --- | --- | --- |
-| `/api/health` | `chat: "sse"`, `thinking: true`, `tools: true`, `catalog: "anilist"` | **old** — only `{ ok, vision, tmdb }` |
-| AniList tools on chat | `search_anime`, `get_anime`, `browse_catalog`, `search_character` when client sent no facts | **not deployed** |
-| GitHub Action `Deploy Worker` | runs on `worker/**` push | **fails** — `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` empty |
+| `/api/health` | `chat: "sse"`, `thinking: true`, `tools: true`, `catalog: "anilist"` | **live** — same shape (verified) |
+| AniList tools on chat | `search_anime`, `get_anime`, `browse_catalog`, `search_character` when client sent no facts | **deployed** (`cd worker && npx wrangler deploy`, version `cc04a31f`) |
+| GitHub Action `Deploy Worker` | runs on `worker/**` push | **still fails** — `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` empty |
 
-PWA still works: it pre-fetches AniList facts client-side (`buddy-catalog.ts`) and stuffs them into the prompt. Worker tools only matter when the client sends **no** `catalogFacts` / picks.
+PWA pre-fetches AniList facts client-side (`buddy-catalog.ts`) and stuffs them into the prompt. Worker tools cover turns with **no** `catalogFacts` / picks.
 
-### Deploy Worker (you must do this once)
+### Redeploy Worker
 
-**Option A — CLI (fastest)**
+**Option A — CLI** (this is how live parity shipped; `wrangler login` already done on the owner machine)
 
 ```bash
 cd worker
 npm ci
-npx wrangler login          # once
 npx wrangler deploy
 # secrets already on the Worker stay; only re-put if missing:
 # npx wrangler secret put DEEPSEEK_API_KEY
 ```
 
-**Option B — fix CI**
+**Option B — fix CI** (still needed so `main` pushes to `worker/**` deploy themselves)
 
 1. Cloudflare → API Tokens → create token with **Workers Scripts: Edit**  
 2. GitHub repo → Settings → Secrets and variables → Actions  
@@ -79,7 +78,7 @@ Expect:
 | 9 | Session summary every N turns (token save) | Later |
 | 10 | Compare two catalog titles side by side | Later |
 | — | **AniList facts in chat** (PWA pre-fetch) | **Shipped 0.3.11** |
-| — | **Worker AniList tools + health fields** | **Source ready — needs deploy** |
+| — | **Worker AniList tools + health fields** | **Live 2026-08-24** (CLI deploy; CI secrets still missing) |
 
 Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 
@@ -95,7 +94,7 @@ Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 - `what's trending` / `ten sezon` → live list + covers
 - `znajdź Spy x Family` / bare `spy x family` → catalog cards (no DeepSeek)
 
-Ren does **not** invent catalog facts. The PWA looks titles up (`src/lib/buddy-catalog.ts`) and stuffs compact facts into the prompt. Worker tools cover turns with no client facts — **after** a successful Worker deploy.
+Ren does **not** invent catalog facts. The PWA looks titles up (`src/lib/buddy-catalog.ts`) and stuffs compact facts into the prompt. Worker tools cover turns with no client facts.
 
 ---
 
@@ -126,4 +125,4 @@ Top 8 trending, 45s rotate, dots to jump.
 ### Deploy
 
 - Pages: push `main`  
-- Worker: **must** have Cloudflare auth (see above) — Pages alone is not enough
+- Worker: CLI `cd worker && npx wrangler deploy` (live is at parity). CI still needs `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` — Pages alone does not update the Worker.
