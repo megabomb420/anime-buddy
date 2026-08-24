@@ -1,6 +1,6 @@
 # Anime Buddy
 
-**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.6**
+**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.7**
 
 **Source:** [github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
 
@@ -14,18 +14,18 @@ UI chrome is **English**. Ren still answers Polish in Polish.
 
 | Screen | What you get |
 | --- | --- |
-| **Home** | Featured hero (rotates), trending, tonight picks. **App version + Update** at the bottom. |
+| **Home** | Featured hero (rotates every 45s, dots to jump), trending, tonight picks. **App version + Update** at the bottom. |
 | **Discover** | Live search from 2 letters (covers). Trending / Seasonal / Popular. iOS safe-area header. |
 | **Scan** | Camera or photo of a figurine / character art → AniList match |
 | **Library** | Watching, want to watch, completed. Same safe-area as Discover. |
 | **Buddy** | Full-height chat with Ren. Recs come as tappable cover cards. `I finished Attack on Titan…` → confirm card → Library. Replies type out. |
-| **Profile** | Taste, age gate, Worker override, data export. Version also lives here, but Home is the one you see. |
+| **Profile** | Taste, age gate, Worker override, data export. |
 
 Catalog is **AniList**. Scores may also show Jikan (MAL). AI never invents titles, scores, or streaming facts.
 
 ## Buddy (Ren)
 
-Night-owl anime companion. Short, dry. Anime lane only — math, code, homework get a deflection, not an answer. Lock is on the **client and the Worker**. No bypass code.
+Night-owl anime companion. Short, dry. Anime lane only — math, code, homework get a deflection, not an answer. Lock is on the **client and the Worker**.
 
 ## Live AI
 
@@ -49,6 +49,8 @@ GITHUB_PAGES=true npm run build
 ```
 
 Push to `main` publishes the PWA. Worker is a **separate** deploy (`cd worker && npx wrangler deploy`).
+
+If the phone still looks old after a deploy: clear site data for `megabomb420.github.io` (PWA service worker) and check the Home footer version.
 
 ## Docs
 
