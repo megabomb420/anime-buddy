@@ -53,7 +53,7 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 | Pages | **v0.3.20** — `version.json` must match `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live (CLI deploy). Persona includes spoiler lock. |
-| Worker GitHub Action | **Still fails** — `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` empty |
+| Worker GitHub Action | Secrets configured 2026-08-24 — CI deploy armed, verify latest run is green |
 | Owner CLI | `wrangler` logged in as `przemek.fall@gmail.com` / account Whip Blanket. `cd worker && npx wrangler deploy` works on that machine |
 
 If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.20**.
@@ -147,8 +147,7 @@ If you lack Cloudflare credentials: say so. Do not pretend it deployed. CI Worke
 
 Suggested order, small PRs:
 
-1. **Worker CI secrets** — tell the user to add `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; do not invent a deploy.
-2. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
+1. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
 
 Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 

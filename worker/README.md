@@ -36,6 +36,20 @@ Do **not** put the key in the app, in `VITE_` env vars, or in `wrangler.toml`.
 | `POST /api/ai/vision` | Anime Lens (DeepSeek V4 Flash). `503` if the secret is missing |
 | `GET /api/tmdb/*` | TMDB passthrough with secret API key |
 
+## CI deploy (this repo)
+
+`.github/workflows/deploy-worker.yml` deploys on every push that touches
+`worker/**` (or manually via **Actions → Deploy Worker → Run workflow**).
+Needs two repo secrets (**Settings → Secrets and variables → Actions**):
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Both are configured
+(since 2026-08-24); the live Worker deploys from CI.
+
+After any deploy, health must read `chat: "sse"`, `thinking: true`, `tools: true`:
+
+```bash
+curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
+```
+
 ## CLI (optional)
 
 ```bash
