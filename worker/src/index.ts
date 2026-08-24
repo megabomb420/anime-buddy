@@ -23,10 +23,8 @@
 
 import {
   blockUser,
-  buildOpenSystemPrompt,
   buildSystemPrompt,
   guardReply,
-  isPersonaUnlock,
   sanitizeMessages,
   type BuddyContext,
   type ChatMessage,
@@ -99,7 +97,6 @@ async function deepseekBuddyChatStream(
   messages: ChatMessage[],
   lastUser: string,
   cors: Record<string, string>,
-  unlocked = false,
 ): Promise<Response> {
   const res = await fetch(DEEPSEEK_URL, {
     method: "POST",
@@ -156,12 +153,12 @@ async function deepseekBuddyChatStream(
             }
           }
         }
-        const guarded = unlocked ? full.trim() : guardReply(full, lastUser);
+        const guarded = guardReply(full, lastUser);
         if (guarded !== full) send({ r: guarded });
         send({ d: true });
         controller.close();
       } catch (err) {
-        send({ r: unlocked ? "DeepSeek went quiet. Try me again in a second." : guardReply("", lastUser) || "DeepSeek went quiet. Try me again in a second." });
+        send({ r: guardReply("", lastUser) || "DeepSeek went quiet. Try me again in a second." });
         controller.close();
         void err;
       }
@@ -301,15 +298,12 @@ export default {
             const messages = sanitizeMessages(body.messages);
             const context = (body.context ?? {}) as BuddyContext;
             const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
-            const unlocked = isPersonaUnlock(body.unlock);
-            if (!unlocked) {
-              const blocked = blockUser(lastUser);
-              if (blocked) {
-                return json({ reply: blocked }, { status: 200 }, cors);
-              }
+            const blocked = blockUser(lastUser);
+            if (blocked) {
+              return json({ reply: blocked }, { status: 200 }, cors);
             }
-            const system = unlocked ? buildOpenSystemPrompt(context) : buildSystemPrompt(context);
-            return deepseekBuddyChatStream(env, system, messages, lastUser, cors, unlocked);
+            const system = buildSystemPrompt(context);
+            return deepseekBuddyChatStream(env, system, messages, lastUser, cors);
           }
 
           case "/api/ai/recommend": {

@@ -1,7 +1,7 @@
 # Anime Buddy — Handover
 
 **Date:** 2026-08-24  
-**App version:** `0.3.4` (see Profile → App version + `version.json` on Pages)  
+**App version:** `0.3.5` (see Profile → App version + `version.json` on Pages)  
 **Owner repo:** [megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy) (public)  
 **Live app:** [https://megabomb420.github.io/anime-buddy/](https://megabomb420.github.io/anime-buddy/)
 
@@ -42,7 +42,7 @@ Worker is **baked in** for Scan + Buddy. Profile can override; reset returns to 
 
 ## Versioning
 
-- `package.json` → semver shown in UI (`0.3.4`+)
+- `package.json` → semver shown in UI (`0.3.5`+)
 - CI injects `VITE_APP_VERSION`, `VITE_GIT_SHA` (7 chars), `VITE_BUILD_TIME`
 - Each Pages deploy writes `dist/version.json` `{ version, commit, builtAt }`
 - **Profile → App version** compares this install to `version.json` (no-store fetch)
@@ -105,7 +105,7 @@ Statuses: completed · watching · plan_to_watch · on_hold · dropped
 1. Client `src/lib/buddy/persona.ts` before API
 2. Worker `worker/src/persona.ts` on `POST /api/ai/chat`
 
-Owner unlock: type `deep7717` in Buddy chat. Toggles the lock. Stored in IndexedDB settings (`personaUnlocked`) + localStorage, so it survives closing the app. Same code again re-locks. Header shows `DeepSeek · open` when off. Worker must receive `unlock` in the chat body — needs a Worker deploy to actually answer off-lane (math/code). Client lock drops immediately.
+No owner bypass. Lock stays on.
 
 ---
 
@@ -181,7 +181,6 @@ Persona / vision changes need a **Worker** redeploy, not only Pages.
 - [x] App version + latest check on Profile
 - [x] Buddy full-height chat (empty state fills the screen; composer above tab bar)
 - [x] Buddy types replies one character at a time (caret + dots). Worker source has DeepSeek thinking on (`deepseek-v4-flash`); live Worker is still JSON until Cloudflare secrets exist.
-- [x] Owner persona unlock: type `deep7717` in Buddy — persists in IndexedDB/localStorage across restarts; same code re-locks
 - [x] README + this handover
 
 ---
@@ -189,7 +188,7 @@ Persona / vision changes need a **Worker** redeploy, not only Pages.
 ## Verify after deploy
 
 1. Hard-refresh the live app (clear PWA cache if stuck).
-2. Profile → **App version** shows `v0.3.4` (or current) and *latest* or *update*.
+2. Profile → **App version** shows `v0.3.5` (or current) and *latest* or *update*.
 3. `curl -s https://megabomb420.github.io/anime-buddy/version.json`
 4. Buddy empty screen: prompt cards fill the view; composer sits on the tab bar (no black void).
 5. Buddy: `oglądałem Naruto` → confirm card → appears in Library.
