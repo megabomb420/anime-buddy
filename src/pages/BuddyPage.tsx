@@ -24,6 +24,13 @@ import {
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { animeTitle } from "@/lib/media";
 import { looksPolish } from "@/lib/buddy/persona";
+import {
+  isPersonaUnlockCode,
+  loadPersonaUnlocked,
+  readUnlockCache,
+  setPersonaUnlocked,
+  unlockAck,
+} from "@/lib/buddy/unlock";
 import { typeOut } from "@/lib/buddy-type";
 import { persistence } from "@/lib/db/persistence";
 import { memoryService } from "@/lib/services/MemoryService";
@@ -98,6 +105,7 @@ export default function BuddyPage() {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [unlocked, setUnlocked] = useState(readUnlockCache);
   const live = Boolean(getWorkerUrl());
   const scrollerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -117,6 +125,10 @@ export default function BuddyPage() {
           .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       );
     })();
+  }, []);
+
+  useEffect(() => {
+    void loadPersonaUnlocked().then(setUnlocked);
   }, []);
 
   useEffect(() => {
@@ -207,6 +219,24 @@ export default function BuddyPage() {
     if (!text || sending) return;
 
     const polish = looksPolish(text) || /[ąćęłńóśźż]/i.test(text);
+    if (isPersonaUnlockCode(text)) {
+      if (!textRaw) setInput("");
+      setSending(true);
+      try {
+        const next = await setPersonaUnlocked(!unlocked);
+        setUnlocked(next);
+        const convo = await ensureConvo();
+        await memoryService.appendMessage(convo.id, "user", text);
+        setMessages((prev) => [...prev, { role: "user", content: text, polish }]);
+        const reply = unlockAck(next, polish);
+        await memoryService.appendMessage(convo.id, "assistant", reply);
+        await revealAssistant({ role: "assistant", polish }, reply);
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
     const spam = checkMessageSpam(text);
     if (!spam.ok && spam.reason) {
       if (!textRaw) setInput("");
@@ -281,6 +311,7 @@ export default function BuddyPage() {
           tasteSummary: taste?.summary,
         },
         onDelta,
+        { unlocked },
       );
 
       await memoryService.appendMessage(convo.id, "assistant", reply);
@@ -311,7 +342,7 @@ export default function BuddyPage() {
                 live ? "bg-foreground" : "bg-muted-foreground/50",
               )}
             />
-            {live ? "DeepSeek · live" : "Local until the Worker is connected"}
+            {live ? (unlocked ? "DeepSeek · open" : "DeepSeek · live") : "Local until the Worker is connected"}
           </p>
         </div>
         <Button

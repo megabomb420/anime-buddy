@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS: Settings = {
   region: "IE",
   contentVisibility: "hide_18_plus",
   onboardingCompleted: false,
+  personaUnlocked: false,
   updatedAt: 0,
 };
 

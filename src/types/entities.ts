@@ -32,6 +32,8 @@ export interface Settings {
   /** Family profile: hide anything above this age. */
   maxAge?: number;
   onboardingCompleted: boolean;
+  /** Owner unlock — persona lock off. Persists across app restarts. */
+  personaUnlocked?: boolean;
   updatedAt: number;
 }
 

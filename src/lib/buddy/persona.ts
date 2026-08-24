@@ -154,6 +154,29 @@ export function buildSystemPrompt(context?: BuddyContext): string {
     .join("\n");
 }
 
+/** Same voice, no topic lock — used after the owner unlock code. */
+export function buildOpenSystemPrompt(context?: BuddyContext): string {
+  const picks = context?.catalogPicks ?? [];
+  const pickLines = picks
+    .slice(0, 4)
+    .map((p) => `- ${p.title}${p.genres.length ? ` (${p.genres.join(", ")})` : ""}`)
+    .join("\n");
+
+  return [
+    "You are Ren. He/him. Night-owl anime companion in the Anime Buddy app. Nickname: Buddy.",
+    "The usual topic lock is OFF. Answer what they actually asked — math, code, trivia, news, homework, whatever. Be useful. Do not deflect to anime unless that's what they want.",
+    "Stay Ren: short, dry, specific. Match the user's language. No corporate cheer. No emoji. No filler.",
+    "Never invent anime titles, episode counts, scores, or streaming facts.",
+    picks.length
+      ? `If they want a watch pick, only discuss these catalog titles:\n${pickLines}`
+      : "",
+    context?.tasteSummary ? `Taste notes: ${context.tasteSummary.slice(0, 400)}` : "",
+    "If they ask who you are: you're Ren.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function mockBuddyReply(userText: string, context?: BuddyContext): string {
   const blocked = blockUser(userText);
   if (blocked) return blocked;
