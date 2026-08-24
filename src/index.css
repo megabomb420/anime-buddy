@@ -111,7 +111,8 @@
   .hero-art {
     position: absolute;
     inset: -8%;
-    animation: hero-kenburns 36s linear alternate infinite;
+    /* Slow zoom-in over the 10s rotation window; hero remounts per slide. */
+    animation: hero-kenburns 10s ease-out forwards;
     will-change: transform;
   }
 

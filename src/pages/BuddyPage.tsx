@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import {
   ArrowUp,
   Clock,
@@ -184,10 +184,21 @@ export default function BuddyPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const live = Boolean(getWorkerUrl());
+  const location = useLocation();
   const scrollerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<UiMessage[]>([]);
   messagesRef.current = messages;
+
+  // "Ask Ren" from Featured pre-fills the composer once, then clears state.
+  useEffect(() => {
+    const prefill = (location.state as { prefill?: string } | null)?.prefill;
+    if (!prefill) return;
+    setInput(prefill);
+    window.history.replaceState({}, "");
+    requestAnimationFrame(() => inputRef.current?.focus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
 
   useEffect(() => {
     void (async () => {

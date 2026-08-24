@@ -1,8 +1,8 @@
 # Anime Buddy — Handover (for the next agent)
 
 **Date:** 2026-08-24  
-**App version:** `0.3.18` (live)  
-**HEAD:** `main` @ 0.3.18 (see `git log -1`)  
+**App version:** `0.3.19` (live)  
+**HEAD:** `main` @ 0.3.19 (see `git log -1`)  
 **Live PWA:** https://megabomb420.github.io/anime-buddy/  
 **Source:** https://github.com/megabomb420/anime-buddy  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev  
@@ -50,13 +50,13 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 
 | Surface | State |
 | --- | --- |
-| Pages | **v0.3.18** — `version.json` must match `package.json` |
+| Pages | **v0.3.19** — `version.json` must match `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live (CLI deploy). Persona includes spoiler lock. |
 | Worker GitHub Action | **Still fails** — `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` empty |
 | Owner CLI | `wrangler` logged in as `przemek.fall@gmail.com` / account Whip Blanket. `cd worker && npx wrangler deploy` works on that machine |
 
-If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.18**.
+If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.19**.
 
 ```bash
 curl -s https://megabomb420.github.io/anime-buddy/version.json
@@ -77,6 +77,7 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.14 | **For you** polish — reason under each poster, Refresh cycles next-best titles, Interested / Not for me tap feedback via `recordFeedback` (`forYou()` returns `reasons`, takes `excludeIds`) |
 | 0.3.15 | **Tonight** no longer Crunchyroll-first (`requireCrunchyroll: false`, same as Ren recs) → picks always render |
 | 0.3.18 | Featured hero: **swipe left/right** on touch (48px threshold, vertical scroll untouched), rotation now **10s**, manual pick (dots or swipe) restarts the timer |
+| 0.3.19 | Hero dedupe: **Open title** → detail, **Details** replaced by **Ask Ren** → `/buddy` with `location.state.prefill` (BuddyPage consumes it once). Cover **slow zoom-in** synced to the 10s window (`hero-kenburns` now `10s ease-out forwards`) |
 | 0.3.16 | **Session recap** — `src/lib/buddy-session.ts`: chats longer than 12 messages send a deterministic `[Earlier in this chat — recap]` (logged / rated / looked-up / rec asks) + last 11 verbatim to the Worker. Token save without Ren forgetting; no Worker change |
 | 0.3.17 | **Compare two titles** — `parseCompareQuery` in `catalog-search.ts` + `src/components/anime/CompareCard.tsx`: `compare X and Y` / `porównaj X z Y` / `X vs Y` → side-by-side AniList facts (score, episodes, status, format, season, genres, studio). No DeepSeek |
 

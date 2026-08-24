@@ -1,6 +1,6 @@
 import { useRef, type TouchEvent } from "react";
 import { Link } from "react-router";
-import { Info, Play } from "lucide-react";
+import { MessageCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgeBadge } from "@/components/AgeBadge";
 import { anilistScore10, animeTitle, formatLabel, seasonLabel } from "@/lib/media";
@@ -125,9 +125,9 @@ export function FeaturedHero({
               </Link>
             </Button>
             <Button asChild variant="secondary" className="h-11 rounded-full px-5 bg-foreground/10 hover:bg-foreground/16">
-              <Link to={`/anime/${anime.anilistId}`}>
-                <Info className="size-4" />
-                Details
+              <Link to="/buddy" state={{ prefill: `tell me about ${title}` }}>
+                <MessageCircle className="size-4" />
+                Ask Ren
               </Link>
             </Button>
           </div>
