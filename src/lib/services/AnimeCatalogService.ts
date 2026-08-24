@@ -21,8 +21,21 @@ import type { AnimeSummary, CharacterSummary } from "@/types/anime";
 const MAL_EXTRAS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const AVAILABILITY_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
 const SEARCH_TTL_MS = 60 * 1000;
-
 const searchMemo = new Map<string, { at: number; items: AnimeSummary[] }>();
+
+const listMemo = new Map<string, { at: number; items: AnimeSummary[] }>();
+const LIST_TTL_MS = 5 * 60 * 1000;
+
+function remember(key: string, items: AnimeSummary[]): AnimeSummary[] {
+  listMemo.set(key, { at: Date.now(), items });
+  return items;
+}
+
+function recall(key: string): AnimeSummary[] | null {
+  const hit = listMemo.get(key);
+  if (hit && Date.now() - hit.at < LIST_TTL_MS) return hit.items;
+  return null;
+}
 
 export class AnimeCatalogService {
   async search(query: string, limit = 20): Promise<AnimeSummary[]> {
@@ -51,21 +64,27 @@ export class AnimeCatalogService {
   }
 
   async getTrending(limit = 20): Promise<AnimeSummary[]> {
+    const key = `trending:${limit}`;
+    const cached = recall(key);
+    if (cached) return cached;
     const anilist = providers.catalog as unknown as {
       getTrending(limit?: number): Promise<AnimeSummary[]>;
     };
     const results = await anilist.getTrending(limit);
     void Promise.all(results.map((r) => persistence.cacheAnime(r)));
-    return results;
+    return remember(key, results);
   }
 
   async getPopular(limit = 20): Promise<AnimeSummary[]> {
+    const key = `popular:${limit}`;
+    const cached = recall(key);
+    if (cached) return cached;
     const anilist = providers.catalog as unknown as {
       getPopular(limit?: number): Promise<AnimeSummary[]>;
     };
     const results = await anilist.getPopular(limit);
     void Promise.all(results.map((r) => persistence.cacheAnime(r)));
-    return results;
+    return remember(key, results);
   }
 
   async getSeasonal(season: string, year: number, limit = 20): Promise<AnimeSummary[]> {

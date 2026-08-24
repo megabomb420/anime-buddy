@@ -32,16 +32,28 @@ function getCurrentSeason(): { season: string; year: number } {
   return { season: "FALL", year };
 }
 
+function titleHaystack(a: AnimeSummary): string[] {
+  return [a.title.english, a.title.romaji, a.title.native].filter(Boolean).map((t) => t!.toLowerCase());
+}
+
+function matchesQuery(a: AnimeSummary, q: string): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return false;
+  const names = titleHaystack(a);
+  if (names.some((n) => n.includes(needle))) return true;
+  return names.some((n) => n.split(/[\s:.\-/'!]+/).some((w) => w.startsWith(needle)));
+}
+
 function rankSuggestions(items: AnimeSummary[], q: string): AnimeSummary[] {
   const needle = q.trim().toLowerCase();
+  const words = (s: string) => s.split(/[\s:.\-/'!]+/).filter(Boolean);
   const score = (a: AnimeSummary) => {
-    const names = [a.title.english, a.title.romaji, a.title.native]
-      .filter(Boolean)
-      .map((t) => t!.toLowerCase());
+    const names = titleHaystack(a);
     if (names.some((n) => n === needle)) return 0;
     if (names.some((n) => n.startsWith(needle))) return 1;
-    if (names.some((n) => n.includes(needle))) return 2;
-    return 3;
+    if (names.some((n) => words(n).some((w) => w.startsWith(needle)))) return 2;
+    if (names.some((n) => n.includes(needle))) return 3;
+    return 4;
   };
   return [...items].sort((a, b) => score(a) - score(b) || (b.anilistScore ?? 0) - (a.anilistScore ?? 0));
 }
@@ -85,6 +97,7 @@ export default function DiscoverPage() {
   const [filters, setFilters] = useState<Filters>({});
   const boxRef = useRef<HTMLFormElement>(null);
   const seqRef = useRef(0);
+  const seedRef = useRef<AnimeSummary[]>([]);
 
   const applyFilters = (anime: AnimeSummary) => {
     if (filters.genre && !anime.genres.includes(filters.genre)) return false;
@@ -120,9 +133,21 @@ export default function DiscoverPage() {
 
   async function liveSearch(q: string) {
     const seq = ++seqRef.current;
-    const local = await persistence.searchCachedAnime(q, 8);
-    if (seq === seqRef.current && local.length) {
-      setSuggestions(rankSuggestions(local, q).slice(0, 6));
+    if (seedRef.current.length === 0) {
+      try {
+        const [popular, trending] = await Promise.all([
+          animeCatalogService.getPopular(50),
+          animeCatalogService.getTrending(30),
+        ]);
+        seedRef.current = uniqueById([...popular, ...trending]);
+      } catch {
+        /* seed is optional */
+      }
+    }
+    const local = await persistence.searchCachedAnime(q, 12);
+    const seeded = uniqueById([...local, ...seedRef.current]).filter((a) => matchesQuery(a, q));
+    if (seq === seqRef.current && seeded.length) {
+      setSuggestions(rankSuggestions(seeded, q).slice(0, 6));
       setSuggestOpen(true);
       setHighlight(0);
     }
@@ -133,15 +158,16 @@ export default function DiscoverPage() {
     try {
       const remote = await animeCatalogService.search(q, 24);
       if (seq !== seqRef.current) return;
-      const merged = uniqueById([...local, ...remote]);
+      const merged = uniqueById([...seeded, ...remote]);
       const ranked = rankSuggestions(merged, q);
       setSuggestions(ranked.slice(0, 6));
       setSuggestOpen(true);
       setHighlight(0);
-      setResults(remote);
+      setResults(ranked.length ? ranked : remote);
     } catch {
       if (seq !== seqRef.current) return;
-      if (!local.length) setError("Search failed — check your connection.");
+      if (!seeded.length) setError("Search failed — check your connection.");
+      else setResults(rankSuggestions(seeded, q));
     } finally {
       if (seq === seqRef.current) setLoading(false);
     }
@@ -189,6 +215,11 @@ export default function DiscoverPage() {
   }, [query]);
 
   useEffect(() => {
+    void Promise.all([animeCatalogService.getPopular(50), animeCatalogService.getTrending(30)]).then(
+      ([popular, trending]) => {
+        seedRef.current = uniqueById([...popular, ...trending]);
+      },
+    );
     const initial = (searchParams.get("q") ?? "").trim();
     if (initial.length >= LIVE_MIN) {
       setQuery(initial);
