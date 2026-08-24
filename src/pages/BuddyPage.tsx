@@ -14,6 +14,7 @@ import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RecPickCard, recPickFromAnime, type RecPick } from "@/components/anime/RecPickCard";
+import { CompareCard } from "@/components/anime/CompareCard";
 import { LibraryConfirmCard } from "@/components/anime/LibraryConfirmCard";
 import { BUDDY_CHIPS, interpretBuddyQuery, wantsRecommendation } from "@/lib/buddy-intent";
 import {
@@ -27,7 +28,7 @@ import {
   rateDoneReply,
   ratePromptReply,
 } from "@/lib/buddy-library";
-import { parseBareTitleQuery, parseLookupQuery, resolveTitleMatch } from "@/lib/catalog-search";
+import { parseBareTitleQuery, parseCompareQuery, parseLookupQuery, resolveTitleMatch } from "@/lib/catalog-search";
 import { factsFromPicks, resolveBuddyCatalog } from "@/lib/buddy-catalog";
 import { buildSessionHistory } from "@/lib/buddy-session";
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
@@ -60,6 +61,10 @@ interface UiMessage {
   rateConfirm?: {
     score: number;
     picks: RecPick[];
+  };
+  compare?: {
+    a: AnimeSummary;
+    b: AnimeSummary;
   };
 }
 
@@ -129,6 +134,15 @@ async function libraryCandidatesForTitles(titles: string[]): Promise<RecPick[]> 
     ),
   );
   return mergePicks(groups.flat(), [], titles.length > 1 ? 12 : 3);
+}
+
+/** Compare: resolve one side to a single confident catalog title (or null). */
+async function compareSide(title: string): Promise<AnimeSummary | null> {
+  const results = await animeCatalogService.search(title, 6);
+  const resolution = resolveTitleMatch(title, results);
+  if (resolution.kind === "match") return resolution.anime;
+  if (resolution.kind === "candidates") return resolution.items[0] ?? null;
+  return resolution.bestGuess ?? null;
 }
 
 function mergePicks(primary: RecPick[], extra: RecPick[], limit = 4): RecPick[] {
@@ -311,6 +325,7 @@ export default function BuddyPage() {
         picks: base.picks,
         libraryConfirm: base.libraryConfirm,
         rateConfirm: base.rateConfirm,
+        compare: base.compare,
       });
     }
   }
@@ -407,6 +422,32 @@ export default function BuddyPage() {
             role: "assistant",
             polish,
             picks: picks.length ? picks : undefined,
+          },
+          reply,
+        );
+        return;
+      }
+
+      const compare = parseCompareQuery(text);
+      if (compare) {
+        const [a, b] = await Promise.all([compareSide(compare.a), compareSide(compare.b)]);
+        let reply: string;
+        if (a && b) {
+          reply = polish ? "Obok siebie, prosto z AniList:" : "Side by side, straight from AniList:";
+        } else {
+          const missing = !a ? compare.a : compare.b;
+          reply = polish
+            ? `Nie znalazłem „${missing}” w katalogu AniList. Spróbuj dokładniejszego tytułu.`
+            : `Couldn't pin down “${missing}” in the AniList catalog. Try a clearer title.`;
+        }
+        const found = a ?? b;
+        await memoryService.appendMessage(convo.id, "assistant", reply);
+        await revealAssistant(
+          {
+            role: "assistant",
+            polish,
+            compare: a && b ? { a, b } : undefined,
+            picks: !(a && b) && found ? [recPickFromAnime(found)] : undefined,
           },
           reply,
         );
@@ -663,6 +704,11 @@ export default function BuddyPage() {
                     {m.picks.map((pick) => (
                       <RecPickCard key={pick.anilistId} pick={pick} />
                     ))}
+                  </div>
+                )}
+                {m.compare && (
+                  <div className="max-w-[85%]">
+                    <CompareCard a={m.compare.a} b={m.compare.b} />
                   </div>
                 )}
               </div>

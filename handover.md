@@ -1,8 +1,8 @@
 # Anime Buddy — Handover (for the next agent)
 
 **Date:** 2026-08-24  
-**App version:** `0.3.16` (live)  
-**HEAD:** `main` @ 0.3.16 (see `git log -1`)  
+**App version:** `0.3.17` (live)  
+**HEAD:** `main` @ 0.3.17 (see `git log -1`)  
 **Live PWA:** https://megabomb420.github.io/anime-buddy/  
 **Source:** https://github.com/megabomb420/anime-buddy  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev  
@@ -37,7 +37,7 @@ Order in `src/pages/BuddyPage.tsx` `send()`:
 
 1. **WRITE** — library / rate / progress (incl. comma / `and` / `i` lists) → AniList search → Confirm cards → IndexedDB. **No DeepSeek.**
 2. **LIBRARY READ** — `what am I watching` / `co oglądam` / `my library` → IndexedDB cards. **No DeepSeek.**
-3. **LOOKUP** — `znajdź` / `find` / bare title → catalog cards. **No DeepSeek.**
+3. **LOOKUP** — `znajdź` / `find` / bare title → catalog cards. **No DeepSeek.** Compare runs here too, checked **before** bare-title: `compare X and Y` / `porównaj X z Y` / bare `X vs Y` → both sides resolved via `resolveTitleMatch` → side-by-side `CompareCard` (AniList facts only).
 4. **CHAT** — rec / facts / free talk → PWA prefetches AniList (`buddy-catalog.ts`) + optional `RecommendationService` → stream DeepSeek with `catalogFacts` / `libraryBrief` / `tasteSummary` / `spoilerLimits`. Long chats go through `buddy-session.ts` first: turns older than the last 11 collapse into one `[Earlier in this chat — recap]` message (deterministic — only echoes parsed user intents), so the Worker never sees more than 12 messages.
 
 Persona lock: client (`src/lib/buddy/persona.ts`) **and** Worker (`worker/src/persona.ts`). Keep them in sync. Spam guard is client-side. User must confirm all library/rating writes.
@@ -50,13 +50,13 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 
 | Surface | State |
 | --- | --- |
-| Pages | **v0.3.16** — `version.json` must match `package.json` |
+| Pages | **v0.3.17** — `version.json` must match `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live (CLI deploy). Persona includes spoiler lock. |
 | Worker GitHub Action | **Still fails** — `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` empty |
 | Owner CLI | `wrangler` logged in as `przemek.fall@gmail.com` / account Whip Blanket. `cd worker && npx wrangler deploy` works on that machine |
 
-If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.16**.
+If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.17**.
 
 ```bash
 curl -s https://megabomb420.github.io/anime-buddy/version.json
@@ -77,6 +77,7 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.14 | **For you** polish — reason under each poster, Refresh cycles next-best titles, Interested / Not for me tap feedback via `recordFeedback` (`forYou()` returns `reasons`, takes `excludeIds`) |
 | 0.3.15 | **Tonight** no longer Crunchyroll-first (`requireCrunchyroll: false`, same as Ren recs) → picks always render; Featured hero rotates every **20s** |
 | 0.3.16 | **Session recap** — `src/lib/buddy-session.ts`: chats longer than 12 messages send a deterministic `[Earlier in this chat — recap]` (logged / rated / looked-up / rec asks) + last 11 verbatim to the Worker. Token save without Ren forgetting; no Worker change |
+| 0.3.17 | **Compare two titles** — `parseCompareQuery` in `catalog-search.ts` + `src/components/anime/CompareCard.tsx`: `compare X and Y` / `porównaj X z Y` / `X vs Y` → side-by-side AniList facts (score, episodes, status, format, season, genres, studio). No DeepSeek |
 
 Worker tools + SSE health went live via CLI (not CI).
 
@@ -143,9 +144,8 @@ If you lack Cloudflare credentials: say so. Do not pretend it deployed. CI Worke
 
 Suggested order, small PRs:
 
-1. **Compare two catalog titles** (roadmap #10) — AniList ids only, side by side cards.
-2. **Worker CI secrets** — tell the user to add `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; do not invent a deploy.
-3. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
+1. **Worker CI secrets** — tell the user to add `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; do not invent a deploy.
+2. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
 
 Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 
@@ -158,6 +158,7 @@ Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 - `I finished Naruto, Bleach and One Piece` → one confirm per title  
 - `what am I watching` / `co oglądam` → library cards  
 - `znajdź Spy x Family` / `spy x family` → catalog  
+- `compare Naruto and Bleach` / `porównaj Naruto z Bleach` / `Naruto vs Bleach` → side-by-side card  
 - `ile odcinków ma One Piece` → AniList facts + cover  
 - Home **For you** after rating something  
 

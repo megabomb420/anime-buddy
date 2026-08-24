@@ -318,6 +318,7 @@ export function parseLookupQuery(raw: string): string | null {
  * Keeps "Something funny" chips out via wantsRecommendation-style guards in caller.
  */
 export function parseBareTitleQuery(raw: string): string | null {
+
   const text = raw.trim();
   if (text.length < 3 || text.length > 80) return null;
   if (/[?？]/.test(text)) return null;
@@ -335,4 +336,43 @@ export function parseBareTitleQuery(raw: string): string | null {
   if (tokens.length < 1 || tokens.length > 6) return null;
   if (!/[a-zà-žąćęłńóśźż]/i.test(text)) return null;
   return text;
+}
+
+export interface CompareQuery {
+  a: string;
+  b: string;
+}
+
+const COMPARE_HARD_SPLIT = /\s+(?:vs\.?|versus)\s+/i;
+const COMPARE_SOFT_SPLIT = /\s+(?:and|i|z|ze)\s+/i;
+
+/**
+ * "compare Naruto and Bleach" / "porównaj Naruto z Bleach" / bare "Naruto vs Bleach"
+ * → side-by-side catalog compare. The soft split (and / i / z) only applies
+ * after an explicit compare prefix so titles containing "and" stay safe.
+ */
+export function parseCompareQuery(raw: string): CompareQuery | null {
+  const text = raw.trim().replace(/[.!?]+$/, "").trim();
+  if (text.length < 5) return null;
+
+  const prefixed = text.match(
+    /^(?:(?:czy\s+)?(?:możesz|mozesz)\s+)?(?:compare|porównaj|porownaj|zestaw)\s+(.+)$/i,
+  );
+
+  let parts: string[];
+  if (prefixed?.[1]) {
+    const inner = prefixed[1].trim();
+    parts = inner.split(COMPARE_HARD_SPLIT);
+    if (parts.length !== 2) parts = inner.split(COMPARE_SOFT_SPLIT);
+  } else {
+    if (!COMPARE_HARD_SPLIT.test(text)) return null;
+    parts = text.split(COMPARE_HARD_SPLIT);
+  }
+  if (parts.length !== 2) return null;
+
+  const a = parts[0].trim();
+  const b = parts[1].trim();
+  if (a.length < 2 || b.length < 2) return null;
+  if (a.toLowerCase() === b.toLowerCase()) return null;
+  return { a, b };
 }

@@ -4,6 +4,7 @@ import {
   aliasForTitle,
   extractSeasonHint,
   normalizeTitleKey,
+  parseCompareQuery,
   resolveTitleMatch,
   scoreTitleMatch,
   searchQueryVariants,
@@ -135,5 +136,36 @@ describe("resolveTitleMatch", () => {
   it("reports none for total garbage", () => {
     const r = resolveTitleMatch("zzqqxxyy", [NARUTO, SPY]);
     assert.equal(r.kind, "none");
+  });
+});
+
+describe("parseCompareQuery", () => {
+  it("parses 'compare X and Y'", () => {
+    assert.deepEqual(parseCompareQuery("compare Naruto and Bleach"), { a: "Naruto", b: "Bleach" });
+  });
+
+  it("parses Polish prefix with z / i", () => {
+    assert.deepEqual(parseCompareQuery("porównaj Naruto z Bleach"), { a: "Naruto", b: "Bleach" });
+    assert.deepEqual(parseCompareQuery("porownaj Naruto i Bleach"), { a: "Naruto", b: "Bleach" });
+  });
+
+  it("parses bare 'X vs Y'", () => {
+    assert.deepEqual(parseCompareQuery("Naruto vs Bleach"), { a: "Naruto", b: "Bleach" });
+    assert.deepEqual(parseCompareQuery("Spy x Family versus One Piece"), { a: "Spy x Family", b: "One Piece" });
+  });
+
+  it("prefers the hard vs split inside a prefixed compare", () => {
+    assert.deepEqual(parseCompareQuery("compare Attack on Titan vs Naruto"), { a: "Attack on Titan", b: "Naruto" });
+  });
+
+  it("strips trailing punctuation", () => {
+    assert.deepEqual(parseCompareQuery("compare Naruto and Bleach!"), { a: "Naruto", b: "Bleach" });
+  });
+
+  it("rejects single titles, identical sides, and non-compare lines", () => {
+    assert.equal(parseCompareQuery("compare Naruto"), null);
+    assert.equal(parseCompareQuery("compare Naruto and Naruto"), null);
+    assert.equal(parseCompareQuery("Naruto"), null);
+    assert.equal(parseCompareQuery("co oglądam"), null);
   });
 });
