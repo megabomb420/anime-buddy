@@ -12,11 +12,16 @@ export function LibraryConfirmCard({
   pick,
   status,
   polish,
+  progress,
+  score,
   onConfirm,
 }: {
   pick: RecPick;
-  status: LibraryStatus;
+  status?: LibraryStatus;
   polish: boolean;
+  progress?: number;
+  /** When set, this card confirms a rating instead of a library status. */
+  score?: number;
   onConfirm: (pick: RecPick) => Promise<void> | void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -25,8 +30,19 @@ export function LibraryConfirmCard({
   const meta = [seasonLabel(pick.season, pick.seasonYear), pick.format?.replace(/_/g, " ")]
     .filter(Boolean)
     .join(" · ");
-  const score = anilistScore10(pick.anilistScore);
-  const label = libraryStatusLabel(status, polish);
+  const alScore = anilistScore10(pick.anilistScore);
+
+  let actionLabel: string;
+  if (score != null) {
+    actionLabel = polish ? `Zatwierdź · ${score}/10` : `Confirm · ${score}/10`;
+  } else if (status) {
+    const label = libraryStatusLabel(status, polish);
+    const prog =
+      progress != null ? (polish ? ` · odc. ${progress}` : ` · ep ${progress}`) : "";
+    actionLabel = polish ? `Zatwierdź · ${label}${prog}` : `Confirm · ${label}${prog}`;
+  } else {
+    actionLabel = polish ? "Zatwierdź" : "Confirm";
+  }
 
   async function confirm() {
     if (busy || done) return;
@@ -56,7 +72,7 @@ export function LibraryConfirmCard({
             {name}
           </Link>
           {meta && <p className="mt-1 text-[11px] text-muted-foreground">{meta}</p>}
-          {score && <p className="mt-0.5 text-[11px] text-muted-foreground">AniList {score}</p>}
+          {alScore && <p className="mt-0.5 text-[11px] text-muted-foreground">AniList {alScore}</p>}
         </div>
       </div>
       <div className="border-t border-border px-2 py-2">
@@ -68,7 +84,7 @@ export function LibraryConfirmCard({
           onClick={() => void confirm()}
         >
           <Check className="size-3.5" />
-          {done ? (polish ? "Zapisane" : "Saved") : polish ? `Zatwierdź · ${label}` : `Confirm · ${label}`}
+          {done ? (polish ? "Zapisane" : "Saved") : actionLabel}
         </Button>
       </div>
     </div>

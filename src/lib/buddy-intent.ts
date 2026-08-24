@@ -15,7 +15,7 @@ export const BUDDY_CHIPS: BuddyPrompt[] = [
 ];
 
 const REC_ASK =
-  /pole[cć]|polecisz|co (og[lł][aą]da[cć]|obejrze[cć]|og[lł][aą]damy)|na wiecz[oó]r|watch tonight|what (should i |to )?watch|recommend|\brecs?\b|co[śs] (zabawnego|mrocznego|kr[oó]tkiego|lekkiego)|something (funny|dark|short|light)|podobn[ea] do|surprise me|zaskocz|hidden gem|nudzi mi si[eę]|nie wiem co (og[lł]|obejr)|daj (mi )?(co[śs]|tytu[lł])|watch next|co obejrze[cć]/i;
+  /pole[cć]|polecisz|co (og[lł][aą]da[cć]|obejrze[cć]|og[lł][aą]damy)|na wiecz[oó]r|watch tonight|what (should i |to )?watch|recommend|\brecs?\b|co[śs] (zabawnego|mrocznego|kr[oó]tkiego|lekkiego)|something (funny|dark|short|light)|podobn[ea] do|surprise me|zaskocz|hidden gem|nudzi mi si[eę]|nie wiem co (og[lł]|obejr)|daj (mi )?(co[śs]|tytu[lł])|watch next|co obejrze[cć]|after |po (obejrzeniu |skończeniu )?|what next/i;
 
 const NOT_REC =
   /ile odcink|how many episode|kto (to|gra|dubbing)|who (is|plays)|co to za postać|what character|score of|ocena /i;
@@ -33,8 +33,36 @@ export function wantsRecommendation(raw: string): boolean {
 export function isVagueCatalogQuery(raw: string): boolean {
   const q = raw.trim().toLowerCase();
   if (!q) return true;
-  if (wantsRecommendation(q) && !/(podobn\w*\s+do|like |jak )/.test(q)) return true;
+  if (wantsRecommendation(q) && !/(podobn\w*\s+do|like |jak |after |po )/.test(q)) return true;
   return /^(surprise me|zaskocz|co ogląda[cć]|co obejrze[cć]|tonight|wieczorem)$/i.test(q);
+}
+
+/** Extract "I have 40 minutes" style budgets. */
+export function parseTimeBudgetMinutes(raw: string): number | undefined {
+  const q = raw.toLowerCase();
+  const hour = q.match(/(\d+(?:[.,]\d+)?)\s*(?:h\b|godzin)/i);
+  if (hour) {
+    const h = Number(hour[1].replace(",", "."));
+    if (Number.isFinite(h) && h > 0 && h <= 12) return Math.round(h * 60);
+  }
+  const min = q.match(/(?:mam|have|got)?\s*(\d{1,3})\s*(?:min(?:ute)?s?|minut)/i);
+  if (min) {
+    const m = Number(min[1]);
+    if (Number.isFinite(m) && m >= 10 && m <= 600) return m;
+  }
+  if (/one sitting|na raz|jednym posiedzeniu/.test(q)) return 90;
+  if (/tonight|wieczor/.test(q) && /short|kr[oó]tk/.test(q)) return 60;
+  return undefined;
+}
+
+/** "what next after Attack on Titan" / "po Naruto". */
+export function parseAfterTitle(raw: string): string | undefined {
+  const m = raw.match(
+    /(?:(?:what )?next after|after (?:watching )?|podobn\w* do|like|jak|po (?:obejrzeniu |skończeniu )?)\s+(.+)$/i,
+  );
+  if (!m?.[1]) return undefined;
+  const title = m[1].replace(/[.!?]+$/, "").trim();
+  return title.length >= 2 ? title : undefined;
 }
 
 /** Map a free-text request onto catalog search + recommendation context. Never invents titles. */
@@ -45,24 +73,42 @@ export function interpretBuddyQuery(raw: string): BuddyPrompt {
   const chip = BUDDY_CHIPS.find((c) => c.label.toLowerCase() === lower);
   if (chip) return chip;
 
-  const like = q.match(/(?:podobn\w*\s+do|like|jak)\s+(.+)$/i);
-  if (like?.[1]) {
-    return { label: q, query: like[1].trim(), context: "similar" };
+  const after = parseAfterTitle(q);
+  if (after && /after |next after|po (?:obejrzeniu|skończeniu)|podobn|like |jak /.test(lower)) {
+    return {
+      label: q,
+      query: after,
+      context: "similar",
+      timeBudgetMinutes: parseTimeBudgetMinutes(q),
+    };
   }
+
+  const budget = parseTimeBudgetMinutes(q);
+
   if (/funny|comedy|laugh|zabawn|komedi/.test(lower)) {
-    return { label: q, query: "comedy slice of life", context: "mood-funny" };
+    return { label: q, query: "comedy slice of life", context: "mood-funny", timeBudgetMinutes: budget };
   }
   if (/dark|grim|psychological|horror|mroczn|psychologiczn/.test(lower)) {
-    return { label: q, query: "psychological thriller", context: "mood-dark" };
+    return { label: q, query: "psychological thriller", context: "mood-dark", timeBudgetMinutes: budget };
   }
-  if (/short|tonight|one sitting|90 min|hour|wieczor|kr[oó]tk/.test(lower)) {
-    return { label: q, query: q, context: "tonight", timeBudgetMinutes: 90 };
+  if (budget != null || /short|tonight|one sitting|wieczor|kr[oó]tk/.test(lower)) {
+    return {
+      label: q,
+      query: budget != null ? `anime under about ${budget} minutes total runtime or short series` : q,
+      context: "tonight",
+      timeBudgetMinutes: budget ?? 90,
+    };
   }
   if (/12\+|family|kids|teen|rodzin/.test(lower)) {
-    return { label: q, query: q, context: "family" };
+    return { label: q, query: q, context: "family", timeBudgetMinutes: budget };
   }
   if (/surprise|zaskocz/.test(lower)) {
-    return { label: q, query: q, context: "surprise" };
+    return { label: q, query: q, context: "surprise", timeBudgetMinutes: budget };
   }
-  return { label: q, query: q, context: wantsRecommendation(q) ? "chat-rec" : "chat" };
+  return {
+    label: q,
+    query: q,
+    context: wantsRecommendation(q) ? "chat-rec" : "chat",
+    timeBudgetMinutes: budget,
+  };
 }
