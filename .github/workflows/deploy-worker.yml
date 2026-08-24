@@ -2,6 +2,11 @@ name: Deploy Worker
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - ".github/workflows/deploy-worker.yml"
 
 jobs:
   deploy:
@@ -15,3 +20,4 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           command: deploy
+          wranglerVersion: "4.28.0"
