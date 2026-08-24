@@ -24,6 +24,7 @@ import {
   ratePromptReply,
 } from "@/lib/buddy-library";
 import { parseBareTitleQuery, parseLookupQuery } from "@/lib/catalog-search";
+import { factsFromPicks, resolveBuddyCatalog } from "@/lib/buddy-catalog";
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { animeTitle } from "@/lib/media";
 import { looksPolish } from "@/lib/buddy/persona";
@@ -37,6 +38,7 @@ import { tasteService } from "@/lib/services/TasteService";
 import { getWorkerUrl } from "@/lib/worker-gateway";
 import { cn } from "@/lib/utils";
 import type { Conversation, LibraryStatus } from "@/types/entities";
+import type { AnimeSummary } from "@/types/anime";
 
 interface UiMessage {
   role: "user" | "assistant";
@@ -72,8 +74,8 @@ const LOG_PREFIXES = [
   { label: "Rate…", prefix: "rate " },
 ];
 
-async function catalogPicksFor(text: string): Promise<RecPick[]> {
-  if (!wantsRecommendation(text)) return [];
+async function catalogPicksFor(text: string): Promise<{ picks: RecPick[]; factsText: string }> {
+  if (!wantsRecommendation(text)) return { picks: [], factsText: "" };
   const prompt = interpretBuddyQuery(text);
   const rec = await recommendationService.recommend({
     query: prompt.query,
@@ -82,17 +84,32 @@ async function catalogPicksFor(text: string): Promise<RecPick[]> {
     localOnly: !getWorkerUrl(),
     candidateLimit: 24,
   });
+  const animes: AnimeSummary[] = [];
   const picks: RecPick[] = [];
   for (const item of rec.items) {
     const anime = await animeCatalogService.getAnime(item.anilistId);
-    if (anime) picks.push(recPickFromAnime(anime, item.reason));
+    if (anime) {
+      animes.push(anime);
+      picks.push(recPickFromAnime(anime, item.reason));
+    }
   }
-  return picks;
+  return { picks, factsText: factsFromPicks(animes).factsText };
 }
 
 async function libraryCandidates(query: string): Promise<RecPick[]> {
   const results = await animeCatalogService.search(query, 6);
   return results.map((a) => recPickFromAnime(a));
+}
+
+function mergePicks(primary: RecPick[], extra: RecPick[]): RecPick[] {
+  const out: RecPick[] = [];
+  const seen = new Set<number>();
+  for (const p of [...primary, ...extra]) {
+    if (!p?.anilistId || seen.has(p.anilistId)) continue;
+    seen.add(p.anilistId);
+    out.push(p);
+  }
+  return out.slice(0, 4);
 }
 
 function lookupReply(query: string, count: number, polish: boolean): string {
@@ -352,11 +369,17 @@ export default function BuddyPage() {
         return;
       }
 
-      const tastePromise = persistence.getTasteProfile().catch(() => undefined);
-      const picksPromise = wantsRecommendation(text)
+      const recAsk = wantsRecommendation(text);
+      const recPromise = recAsk
         ? catalogPicksFor(text)
-        : Promise.resolve([] as RecPick[]);
-      const [picks, taste] = await Promise.all([picksPromise, tastePromise]);
+        : Promise.resolve({ picks: [] as RecPick[], factsText: "" });
+      const catalogPromise = resolveBuddyCatalog(text);
+      const tastePromise = persistence.getTasteProfile().catch(() => undefined);
+      const [rec, catalog, taste] = await Promise.all([recPromise, catalogPromise, tastePromise]);
+
+      const picks = rec.picks.length ? rec.picks : catalog.animes.map((a) => recPickFromAnime(a));
+      const factsText = rec.factsText || catalog.factsText;
+      let workerPicks: RecPick[] = [];
 
       let added = false;
       const onDelta = (shown: string) => {
@@ -381,16 +404,23 @@ export default function BuddyPage() {
             anilistId: p.anilistId,
             coverImage: p.coverImage,
           })),
+          catalogFacts: factsText || undefined,
+          libraryBrief: catalog.libraryBrief || undefined,
           tasteSummary: taste?.summary,
         },
         onDelta,
+        (extra) => {
+          workerPicks = extra;
+        },
       );
+
+      const shownPicks = mergePicks(picks, workerPicks);
 
       await memoryService.appendMessage(convo.id, "assistant", reply);
       if (!added) {
-        setMessages((prev) => [...prev, { role: "assistant", content: reply, polish, picks }]);
+        setMessages((prev) => [...prev, { role: "assistant", content: reply, polish, picks: shownPicks }]);
       } else {
-        patchLastAssistant({ content: reply, streaming: false, picks });
+        patchLastAssistant({ content: reply, streaming: false, picks: shownPicks });
       }
     } catch {
       await revealAssistant({ role: "assistant" }, "I couldn't respond just now.");

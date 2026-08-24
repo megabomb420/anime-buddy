@@ -30,6 +30,10 @@ export interface BuddyContext {
     anilistId?: number;
     coverImage?: string;
   }>;
+  /** Compact AniList dump for this turn. Ren may state these as fact. */
+  catalogFacts?: string;
+  /** Short "Title (status)" list from the local library. */
+  libraryBrief?: string;
 }
 
 export interface HardConstraints {

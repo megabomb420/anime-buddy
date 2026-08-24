@@ -1,7 +1,7 @@
 # Anime Buddy — Handover
 
 **Date:** 2026-08-24  
-**App version:** `0.3.8`  
+**App version:** `0.3.11`  
 **Live:** https://megabomb420.github.io/anime-buddy/  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev
 
@@ -23,6 +23,7 @@
 | 8 | Spoiler level (settings + prompt) | Next |
 | 9 | Session summary every N turns (token save) | Later |
 | 10 | Compare two catalog titles side by side | Later |
+| — | **AniList facts in chat** (`ile odcinków ma …`, `kto to …`, trending) → DeepSeek talks from catalog dump, not memory | **Shipped 0.3.11** |
 
 Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 
@@ -32,13 +33,20 @@ Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 - `rate 9 Attack on Titan` → confirm score  
 - `rzuciłem One Piece bo filler` → dropped + reason signal  
 - `mam 40 min, coś lekkiego` → short tonight recs  
-- `what next after Steins;Gate` → similar cards  
+- `what next after Steins;Gate` → similar cards
+- `ile odcinków ma One Piece` → episode count from AniList + cover
+- `kto to Lelouch` → character + their anime from AniList
+- `what's trending` / `ten sezon` → live list + covers
+
+Ren does **not** call AniList himself. The PWA looks titles up (`src/lib/buddy-catalog.ts`) and stuffs compact facts into the prompt. Worker source has tools (`search_anime`, `get_anime`, `browse_catalog`, `search_character`) for when no facts were sent — needs a Worker deploy.
+
+`znajdź Spy x Family` stays a fast catalog-card search (no DeepSeek).  
 
 ---
 
 ## If “nothing changed” on the phone
 
-1. Home footer must show **`v0.3.8`** (or newer).  
+1. Home footer must show **`v0.3.11`** (or newer).  
 2. Else clear site data for `megabomb420.github.io` (stale PWA SW).  
 3. `curl -s https://megabomb420.github.io/anime-buddy/version.json`
 

@@ -82,6 +82,16 @@ describe("buildSystemPrompt", () => {
     assert.match(p, /Mob Psycho 100/);
     assert.equal(/deepseek|chatgpt|grok/i.test(p), false);
   });
+
+  it("feeds AniList facts into the prompt", () => {
+    const p = buildSystemPrompt({
+      catalogFacts: "#16498 Attack on Titan · 25 eps · AniList 8.5",
+      libraryBrief: "Frieren (watching)",
+    });
+    assert.match(p, /#16498 Attack on Titan/);
+    assert.match(p, /Frieren \(watching\)/);
+    assert.match(p, /AniList is the catalog/);
+  });
 });
 
 describe("mockBuddyReply", () => {

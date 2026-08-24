@@ -113,7 +113,7 @@ export function parseBareTitleQuery(raw: string): string | null {
   if (/[?？]/.test(text)) return null;
   if (parseLookupQuery(text)) return null;
   if (
-    /pole[cć]|recommend|watch|tonight|wieczor|something |co ogl|co obej|surprise|zabawn|mroczn|daję|rate |episode |odcinek|skończy|oglądam|finished|watching|plan to/i.test(
+    /pole[cć]|recommend|watch|tonight|wieczor|something |co ogl|co obej|surprise|zabawn|mroczn|daję|rate |episode |odcinek|skończy|oglądam|finished|watching|plan to|kto to|who is|tell me about|opowiedz|ile odcink|jaka ocena|score of|posta[cć]/i.test(
       text,
     )
   ) {

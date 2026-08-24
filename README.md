@@ -1,6 +1,6 @@
 # Anime Buddy
 
-**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.7**
+**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.11**
 
 **Source:** [github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
 
@@ -18,7 +18,7 @@ UI chrome is **English**. Ren still answers Polish in Polish.
 | **Discover** | Live search from 2 letters (covers). Trending / Seasonal / Popular. iOS safe-area header. |
 | **Scan** | Camera or photo of a figurine / character art → AniList match |
 | **Library** | Watching, want to watch, completed. Same safe-area as Discover. |
-| **Buddy** | Full-height chat with Ren. Recs come as tappable cover cards. `I finished Attack on Titan…` → confirm card → Library. Replies type out. |
+| **Buddy** | Full-height chat with Ren. He looks titles up on **AniList** (episodes, score, studio, characters) and drops tappable covers. `I finished Attack on Titan…` → confirm. `znajdź Spy x Family` → catalog cards. Replies type out. |
 | **Profile** | Taste, age gate, Worker override, data export. |
 
 Catalog is **AniList**. Scores may also show Jikan (MAL). AI never invents titles, scores, or streaming facts.

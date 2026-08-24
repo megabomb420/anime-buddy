@@ -7,7 +7,7 @@
  *
  * Routes:
  *   GET  /api/health            — liveness check
- *   POST /api/ai/chat           — DeepSeek chat (Buddy conversations)
+ *   POST /api/ai/chat           — DeepSeek chat (Buddy). AniList tools + stream
  *   POST /api/ai/recommend      — DeepSeek semantic reranking of candidates
  *   POST /api/ai/taste          — DeepSeek taste-profile interpretation
  *   POST /api/ai/signals        — DeepSeek taste-signal extraction from notes
@@ -29,6 +29,8 @@ import {
   type BuddyContext,
   type ChatMessage,
 } from "./persona";
+import { CATALOG_TOOLS, picksList, runCatalogTool, type ToolCall } from "./catalog-tools";
+import type { CatalogPick } from "./anilist";
 
 export interface Env {
   DEEPSEEK_API_KEY?: string;
@@ -91,80 +93,59 @@ async function deepseekChat(
   return data.choices?.[0]?.message?.content ?? "";
 }
 
-async function deepseekBuddyChatStream(
+type DsMessage =
+  | { role: "system"; content: string }
+  | ChatMessage
+  | { role: "assistant"; content: string | null; tool_calls: ToolCall[] }
+  | { role: "tool"; tool_call_id: string; content: string };
+
+async function deepseekOnce(
   env: Env,
-  system: string,
-  messages: ChatMessage[],
-  lastUser: string,
-  cors: Record<string, string>,
+  messages: DsMessage[],
+  opts: { tools: boolean; stream: boolean; thinking: boolean },
 ): Promise<Response> {
+  const body: Record<string, unknown> = {
+    model: BUDDY_MODEL,
+    thinking: { type: opts.thinking ? "enabled" : "disabled" },
+    max_tokens: 4096,
+    stream: opts.stream,
+    messages,
+  };
+  if (opts.thinking) body.reasoning_effort = "high";
+  else body.temperature = 0.3;
+  if (opts.tools) body.tools = CATALOG_TOOLS;
+
   const res = await fetch(DEEPSEEK_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${requireDeepSeekKey(env)}`,
     },
-    body: JSON.stringify({
-      model: BUDDY_MODEL,
-      thinking: { type: "enabled" },
-      reasoning_effort: "high",
-      max_tokens: 4096,
-      stream: true,
-      messages: [{ role: "system", content: system }, ...messages],
-    }),
+    body: JSON.stringify(body),
   });
-  if (!res.ok || !res.body) throw new Error(`DeepSeek HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`DeepSeek HTTP ${res.status}`);
+  return res;
+}
 
+function sseResponse(
+  cors: Record<string, string>,
+  run: (send: (obj: unknown) => void) => Promise<void>,
+): Response {
   const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  const upstream = res.body.getReader();
-
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      let buffer = "";
-      let full = "";
       const send = (obj: unknown) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
       };
       try {
-        while (true) {
-          const { done, value } = await upstream.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const payload = trimmed.slice(5).trim();
-            if (!payload || payload === "[DONE]") continue;
-            let json: {
-              choices?: Array<{ delta?: { content?: string; reasoning_content?: string } }>;
-            };
-            try {
-              json = JSON.parse(payload) as typeof json;
-            } catch {
-              continue;
-            }
-            const piece = json.choices?.[0]?.delta?.content ?? "";
-            if (piece) {
-              full += piece;
-              send({ c: piece });
-            }
-          }
-        }
-        const guarded = guardReply(full, lastUser);
-        if (guarded !== full) send({ r: guarded });
-        send({ d: true });
-        controller.close();
+        await run(send);
       } catch (err) {
-        send({ r: guardReply("", lastUser) || "DeepSeek went quiet. Try me again in a second." });
-        controller.close();
         void err;
+        send({ r: "DeepSeek went quiet. Try me again in a second." });
       }
+      controller.close();
     },
   });
-
   return new Response(stream, {
     status: 200,
     headers: {
@@ -173,6 +154,133 @@ async function deepseekBuddyChatStream(
       Connection: "keep-alive",
       ...cors,
     },
+  });
+}
+
+async function runToolRound(
+  env: Env,
+  system: string,
+  messages: ChatMessage[],
+  picks: Map<number, CatalogPick>,
+): Promise<{ content: string; usedTools: boolean }> {
+  const thread: DsMessage[] = [{ role: "system", content: system }, ...messages];
+  let usedTools = false;
+
+  for (let round = 0; round < 3; round++) {
+    const res = await deepseekOnce(env, thread, { tools: true, stream: false, thinking: false });
+    const data = (await res.json()) as {
+      choices?: Array<{
+        message?: {
+          content?: string | null;
+          tool_calls?: ToolCall[];
+        };
+        finish_reason?: string;
+      }>;
+    };
+    const msg = data.choices?.[0]?.message;
+    const calls = (msg?.tool_calls ?? []).filter((c) => c?.function?.name && c.id);
+    if (!calls.length) {
+      return { content: (msg?.content ?? "").trim(), usedTools };
+    }
+    usedTools = true;
+    thread.push({
+      role: "assistant",
+      content: msg?.content ?? null,
+      tool_calls: calls,
+    });
+    const executed = await Promise.all(
+      calls.slice(0, 4).map(async (call) => {
+        const content = await runCatalogTool(call.function.name, call.function.arguments, picks);
+        return { role: "tool" as const, tool_call_id: call.id, content };
+      }),
+    );
+    thread.push(...executed);
+  }
+
+  const last = await deepseekOnce(env, thread, { tools: false, stream: false, thinking: false });
+  const data = (await last.json()) as {
+    choices?: Array<{ message?: { content?: string | null } }>;
+  };
+  return { content: (data.choices?.[0]?.message?.content ?? "").trim(), usedTools };
+}
+
+async function streamThinkingReply(
+  env: Env,
+  system: string,
+  messages: ChatMessage[],
+  lastUser: string,
+  send: (obj: unknown) => void,
+): Promise<void> {
+  const res = await deepseekOnce(
+    env,
+    [{ role: "system", content: system }, ...messages],
+    { tools: false, stream: true, thinking: true },
+  );
+  if (!res.body) throw new Error("DeepSeek empty body");
+  const decoder = new TextDecoder();
+  const upstream = res.body.getReader();
+  let buffer = "";
+  let full = "";
+  while (true) {
+    const { done, value } = await upstream.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payload = trimmed.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      let json: {
+        choices?: Array<{ delta?: { content?: string; reasoning_content?: string } }>;
+      };
+      try {
+        json = JSON.parse(payload) as typeof json;
+      } catch {
+        continue;
+      }
+      const piece = json.choices?.[0]?.delta?.content ?? "";
+      if (piece) {
+        full += piece;
+        send({ c: piece });
+      }
+    }
+  }
+  const guarded = guardReply(full, lastUser);
+  if (guarded !== full) send({ r: guarded });
+  send({ d: true });
+}
+
+async function deepseekBuddyChatStream(
+  env: Env,
+  system: string,
+  messages: ChatMessage[],
+  lastUser: string,
+  cors: Record<string, string>,
+  context?: BuddyContext,
+): Promise<Response> {
+  return sseResponse(cors, async (send) => {
+    const alreadyHasCatalog = Boolean(context?.catalogFacts) || Boolean(context?.catalogPicks?.length);
+    if (alreadyHasCatalog) {
+      await streamThinkingReply(env, system, messages, lastUser, send);
+      return;
+    }
+
+    const picks = new Map<number, CatalogPick>();
+    const { content } = await runToolRound(env, system, messages, picks);
+    const cardPicks = picksList(picks, 4);
+    if (cardPicks.length) send({ p: cardPicks });
+
+    if (content) {
+      const guarded = guardReply(content, lastUser);
+      if (guarded !== content) send({ r: guarded });
+      else send({ c: guarded });
+      send({ d: true });
+      return;
+    }
+
+    await streamThinkingReply(env, system, messages, lastUser, send);
   });
 }
 
@@ -260,6 +368,8 @@ export default {
             tmdb: Boolean(env.TMDB_API_KEY),
             chat: "sse",
             thinking: true,
+            tools: true,
+            catalog: "anilist",
           },
           { status: 200 },
           cors,
@@ -303,7 +413,7 @@ export default {
               return json({ reply: blocked }, { status: 200 }, cors);
             }
             const system = buildSystemPrompt(context);
-            return deepseekBuddyChatStream(env, system, messages, lastUser, cors);
+            return deepseekBuddyChatStream(env, system, messages, lastUser, cors, context);
           }
 
           case "/api/ai/recommend": {

@@ -8,6 +8,7 @@ import {
   sanitizeMessages,
 } from "@/lib/buddy/persona";
 import { typeFromChunks, typeOut } from "@/lib/buddy-type";
+import type { RecPick } from "@/components/anime/RecPickCard";
 import type { BuddyContext, ChatMessage } from "@/types/ai";
 
 /**
@@ -39,7 +40,7 @@ export async function replyAsBuddy(
 
 async function* sseContentChunks(
   res: Response,
-  box: { replace?: string },
+  box: { replace?: string; picks?: RecPick[] },
 ): AsyncGenerator<string> {
   const reader = res.body?.getReader();
   if (!reader) return;
@@ -56,13 +57,14 @@ async function* sseContentChunks(
       if (!trimmed.startsWith("data:")) continue;
       const payload = trimmed.slice(5).trim();
       if (!payload || payload === "[DONE]") continue;
-      let json: { c?: string; r?: string };
+      let json: { c?: string; r?: string; p?: RecPick[] };
       try {
-        json = JSON.parse(payload) as { c?: string; r?: string };
+        json = JSON.parse(payload) as { c?: string; r?: string; p?: RecPick[] };
       } catch {
         continue;
       }
       if (typeof json.r === "string") box.replace = json.r;
+      else if (Array.isArray(json.p) && json.p.length) box.picks = json.p;
       else if (json.c) yield json.c;
     }
   }
@@ -76,6 +78,7 @@ export async function streamAsBuddy(
   messages: ChatMessage[],
   context: BuddyContext | undefined,
   onDelta: (shown: string) => void,
+  onPicks?: (picks: RecPick[]) => void,
 ): Promise<string> {
   const clean = sanitizeMessages(messages);
   const last = [...clean].reverse().find((m) => m.role === "user")?.content ?? "";
@@ -105,14 +108,16 @@ export async function streamAsBuddy(
 
     const ctype = res.headers.get("content-type") ?? "";
     if (ctype.includes("application/json")) {
-      const out = (await res.json()) as { reply?: string };
+      const out = (await res.json()) as { reply?: string; picks?: RecPick[] };
       const reply = guardReply(out.reply ?? "", last);
+      if (out.picks?.length) onPicks?.(out.picks);
       await typeOut(reply, onDelta);
       return reply;
     }
 
-    const box: { replace?: string } = {};
+    const box: { replace?: string; picks?: RecPick[] } = {};
     const typed = await typeFromChunks(sseContentChunks(res, box), onDelta);
+    if (box.picks?.length) onPicks?.(box.picks);
     if (box.replace) {
       onDelta(box.replace);
       return box.replace;
