@@ -3,7 +3,7 @@
  *
  *   user request
  *   → extract hard constraints
- *   → Crunchyroll filter
+ *   → Crunchyroll filter (optional)
  *   → age/family constraints
  *   → library exclusions
  *   → local taste scoring
@@ -19,6 +19,7 @@
 
 import { passesContentPolicy } from "@/lib/age/normalize";
 import { isConfirmedOnCrunchyroll } from "@/lib/availability/resolve";
+import { isVagueCatalogQuery } from "@/lib/buddy-intent";
 import { persistence } from "@/lib/db/persistence";
 import { providers } from "@/lib/providers";
 import type { HardConstraints } from "@/types/ai";
@@ -33,6 +34,29 @@ export interface RecommendOptions {
   localOnly?: boolean;
   region?: string;
   candidateLimit?: number;
+  /** Home recs stay Crunchyroll-first. Ren chat recs skip this so covers always show. */
+  requireCrunchyroll?: boolean;
+}
+
+function currentSeason(): { season: string; year: number } {
+  const now = new Date();
+  const month = now.getMonth();
+  const year = now.getFullYear();
+  if (month <= 2) return { season: "WINTER", year };
+  if (month <= 5) return { season: "SPRING", year };
+  if (month <= 8) return { season: "SUMMER", year };
+  return { season: "FALL", year };
+}
+
+function uniqueAnime(list: AnimeSummary[]): AnimeSummary[] {
+  const seen = new Set<number>();
+  const out: AnimeSummary[] = [];
+  for (const a of list) {
+    if (seen.has(a.anilistId)) continue;
+    seen.add(a.anilistId);
+    out.push(a);
+  }
+  return out;
 }
 
 export class RecommendationService {
@@ -41,13 +65,13 @@ export class RecommendationService {
    * constraint extraction from `query` is a later AI-assisted step; v1
    * derives constraints deterministically.
    */
-  private async buildHardConstraints(region: string): Promise<HardConstraints> {
+  private async buildHardConstraints(region: string, requireCrunchyroll: boolean): Promise<HardConstraints> {
     const settings = await persistence.getSettings();
     const library = await persistence.getLibrary();
     return {
       maxAge: settings.contentVisibility === "family" ? (settings.maxAge ?? 12) : undefined,
       excludeAnilistIds: library.map((e) => e.anilistId),
-      mustBeOnCrunchyroll: true,
+      mustBeOnCrunchyroll: requireCrunchyroll,
       region,
     };
   }
@@ -79,21 +103,57 @@ export class RecommendationService {
     return tasteComponent * 0.6 + qualityComponent * 0.4;
   }
 
+  private async discoveryPool(limit: number): Promise<AnimeSummary[]> {
+    const { season, year } = currentSeason();
+    const [trending, popular, seasonal] = await Promise.all([
+      animeCatalogService.getTrending(Math.max(12, Math.ceil(limit * 0.6))),
+      animeCatalogService.getPopular(Math.max(12, Math.ceil(limit * 0.6))),
+      animeCatalogService.getSeasonal(season, year, 16),
+    ]);
+    return uniqueAnime([...trending, ...seasonal, ...popular]).slice(0, Math.max(limit, 24));
+  }
+
+  private async sourceCandidates(query: string, context: string, limit: number): Promise<AnimeSummary[]> {
+    const searchable =
+      context === "similar" ||
+      context.startsWith("mood-") ||
+      context === "family" ||
+      context === "because-you-like";
+
+    if (searchable && query.trim()) {
+      const hits = await animeCatalogService.search(query, limit);
+      if (hits.length >= 6) return hits;
+      const extra = await this.discoveryPool(limit);
+      return uniqueAnime([...hits, ...extra]).slice(0, limit);
+    }
+
+    if (
+      context === "tonight" ||
+      context === "surprise" ||
+      context === "chat-rec" ||
+      isVagueCatalogQuery(query)
+    ) {
+      return this.discoveryPool(limit);
+    }
+
+    if (!query.trim()) return this.discoveryPool(limit);
+    const hits = await animeCatalogService.search(query, limit);
+    if (hits.length >= 4) return hits;
+    return uniqueAnime([...hits, ...(await this.discoveryPool(limit))]).slice(0, limit);
+  }
+
   async recommend(options: RecommendOptions): Promise<RecommendationRecord> {
     const settings = await persistence.getSettings();
     const region = options.region ?? settings.region;
-    const hard = await this.buildHardConstraints(region);
+    const requireCrunchyroll = options.requireCrunchyroll ?? true;
+    const hard = await this.buildHardConstraints(region, requireCrunchyroll);
 
-    // 1. Candidate sourcing — search AniList by the request text. Broader
-    //    discovery modes (Tonight, Hidden Gem, Season Radar) will add their
-    //    own deterministic sources later.
-    const rawCandidates = await animeCatalogService.search(
+    const rawCandidates = await this.sourceCandidates(
       options.query,
+      options.context,
       options.candidateLimit ?? 30,
     );
 
-    // 2–4. Deterministic filters: library exclusions, age/family, then
-    //      Crunchyroll availability for survivors.
     const excluded = new Set(hard.excludeAnilistIds ?? []);
     let candidates = rawCandidates.filter((c) => !excluded.has(c.anilistId));
 
@@ -104,28 +164,28 @@ export class RecommendationService {
       }),
     );
 
-    const withAvailability = await Promise.all(
-      candidates.map((c) => animeCatalogService.resolveAvailabilityFor(c, region)),
-    );
+    let pool = candidates;
+    let fellBackToCandidates = false;
 
-    // Only confirmed Crunchyroll titles are recommendable. If nothing is
-    // verified, surface candidates honestly instead of hallucinating.
-    let pool = withAvailability.filter((c) => isConfirmedOnCrunchyroll(c.availability));
-    const fellBackToCandidates = pool.length === 0;
-    if (fellBackToCandidates) {
-      pool = withAvailability.filter((c) => c.availability?.state === "candidate");
+    if (requireCrunchyroll) {
+      const withAvailability = await Promise.all(
+        candidates.map((c) => animeCatalogService.resolveAvailabilityFor(c, region)),
+      );
+      pool = withAvailability.filter((c) => isConfirmedOnCrunchyroll(c.availability));
+      fellBackToCandidates = pool.length === 0;
+      if (fellBackToCandidates) {
+        pool = withAvailability.filter((c) => c.availability?.state === "candidate");
+      }
     }
+
     pool = pool.slice(0, 30);
 
-    // 5–7. Local taste scoring (character-preference scoring plugs in here
-    //      once Character DNA is populated).
     const scored = await Promise.all(
       pool.map(async (c) => ({ anime: c, score: await this.localTasteScore(c) })),
     );
     scored.sort((a, b) => b.score - a.score);
     const localPool = scored.map((s) => s.anime);
 
-    // 8. AI semantic reranking (optional).
     let items: RecommendationItem[];
     let source: RecommendationRecord["source"] = "local";
 
@@ -138,8 +198,6 @@ export class RecommendationService {
           hardConstraints: hard,
           tasteSummary: taste.summary,
         });
-        // 9. Validate IDs: only accept ids that exist in our pool — the
-        //    model can never invent titles.
         const validIds = new Set(localPool.map((c) => c.anilistId));
         const validated = ranked.filter((r) => validIds.has(r.anilistId));
         if (validated.length > 0) {
@@ -155,7 +213,6 @@ export class RecommendationService {
       items = this.localFallback(scored);
     }
 
-    // 10. Persist + return.
     const reasonSuffix = fellBackToCandidates
       ? " (Crunchyroll availability unconfirmed — shown as candidate)"
       : "";

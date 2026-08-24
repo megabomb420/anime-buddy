@@ -1,7 +1,7 @@
 export interface BuddyContext {
   tasteSummary?: string;
   characterSummary?: string;
-  catalogPicks?: Array<{ title: string; genres: string[] }>;
+  catalogPicks?: Array<{ title: string; genres: string[]; anilistId?: number; coverImage?: string }>;
 }
 
 export interface ChatMessage {

@@ -89,11 +89,12 @@ export const persistence = {
     const q = text.trim().toLowerCase();
     if (!q) return [];
     return db.animeCache
-      .filter(
-        (a) =>
-          a.title.romaji.toLowerCase().includes(q) ||
-          (a.title.english ?? "").toLowerCase().includes(q),
-      )
+      .filter((a) => {
+        const romaji = a.title.romaji.toLowerCase();
+        const english = (a.title.english ?? "").toLowerCase();
+        const native = (a.title.native ?? "").toLowerCase();
+        return romaji.includes(q) || english.includes(q) || native.includes(q);
+      })
       .limit(limit)
       .toArray();
   },

@@ -24,7 +24,12 @@ export interface BuddyContext {
   spoilerLimits?: Array<{ anilistId: number; maxEpisodeSeen: number }>;
   region?: string;
   /** Titles already resolved from the catalog — Buddy must not invent others. */
-  catalogPicks?: Array<{ title: string; genres: string[] }>;
+  catalogPicks?: Array<{
+    title: string;
+    genres: string[];
+    anilistId?: number;
+    coverImage?: string;
+  }>;
 }
 
 export interface HardConstraints {

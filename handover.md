@@ -146,6 +146,8 @@ As of **2026-08-24**, Worker was redeployed with Ren + off-lane lock (math retur
 - [x] Cinematic home (featured + trending), splash, motion polish
 - [x] Ren persona + client/Worker jailbreak + off-lane blocks
 - [x] README + this handover
+- [x] Discover live search: suggestions (covers) after 2 letters
+- [x] Ren recs: catalog cards with cover + in-app link (no invented titles)
 
 ---
 
@@ -153,9 +155,10 @@ As of **2026-08-24**, Worker was redeployed with Ren + off-lane lock (math retur
 
 1. Hard-refresh https://megabomb420.github.io/anime-buddy/ (clear PWA cache if needed).
 2. Buddy → math question → Ren deflection, no numbers.
-3. Buddy → “co oglądać wieczorem” → in-character anime reply.
-4. Scan with a figurine photo → vision path returns candidates (needs live DeepSeek key).
-5. After any `worker/src/**` change: `wrangler deploy` again.
+3. Buddy → “co oglądać wieczorem” → in-character anime reply **plus tappable cover cards**.
+4. Discover → type two letters (e.g. `na`, `at`) → cover suggestions drop down; tap opens the title.
+5. Scan with a figurine photo → vision path returns candidates (needs live DeepSeek key).
+6. After any `worker/src/**` change: `wrangler deploy` again.
 
 Optional later:
 
@@ -169,7 +172,8 @@ Optional later:
 
 - Persona lock is **high-precision, not unbreakable**. Do not claim 100%.
 - Client lock covers the PWA UX; Worker lock covers the API. Keep both in sync.
-- Recommendations must not invent titles; catalog picks only when available.
+- Recommendations must not invent titles; catalog picks only when available. Ren recs render **cover + `/anime/:id` link** under the bubble.
+- Discover search is live from **2 characters** (local cache first, then AniList, debounced). `?q=` still pre-fills.
 - TMDB is optional; without `TMDB_API_KEY`, availability/certs paths stay limited.
 - GitHub Pages and Worker are **two deploys**. Fixing only one leaves the other stale.
 
@@ -180,8 +184,8 @@ Optional later:
 ```bash
 npm ci
 npm run build          # must stay green (Pages CI)
-# optional local persona tests (Node):
-node --experimental-strip-types --test src/lib/buddy/persona.test.ts
+# optional local tests (Node):
+node --experimental-strip-types --test src/lib/buddy/persona.test.ts src/lib/buddy-intent.test.ts
 ```
 
 Worker health:

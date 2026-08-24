@@ -20,10 +20,22 @@ import type { AnimeSummary, CharacterSummary } from "@/types/anime";
 /** How long cached MAL extras / availability stay fresh. */
 const MAL_EXTRAS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const AVAILABILITY_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
+const SEARCH_TTL_MS = 60 * 1000;
+
+const searchMemo = new Map<string, { at: number; items: AnimeSummary[] }>();
 
 export class AnimeCatalogService {
   async search(query: string, limit = 20): Promise<AnimeSummary[]> {
+    const key = `${query.trim().toLowerCase()}:${limit}`;
+    const hit = searchMemo.get(key);
+    if (hit && Date.now() - hit.at < SEARCH_TTL_MS) return hit.items;
+
     const results = await providers.catalog.searchAnime(query, limit);
+    searchMemo.set(key, { at: Date.now(), items: results });
+    if (searchMemo.size > 40) {
+      const oldest = searchMemo.keys().next().value;
+      if (oldest) searchMemo.delete(oldest);
+    }
     // Cache in the background; search latency shouldn't wait for IDB.
     void Promise.all(results.map((r) => persistence.cacheAnime(r)));
     return results;
