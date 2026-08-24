@@ -10,6 +10,7 @@ import {
   libraryPromptReply,
   parseLibraryIntent,
 } from "@/lib/buddy-library";
+import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { animeTitle } from "@/lib/media";
 import { looksPolish } from "@/lib/buddy/persona";
 import { persistence } from "@/lib/db/persistence";
@@ -68,19 +69,39 @@ export default function BuddyPage() {
   }
 
   async function confirmLibrary(status: LibraryStatus, pick: RecPick, polish: boolean) {
+    const spam = checkConfirmSpam();
+    if (!spam.ok && spam.reason) {
+      const reply = spamReply(spam.reason, polish);
+      const convo = await ensureConvo();
+      await memoryService.appendMessage(convo.id, "assistant", reply);
+      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      return;
+    }
+
     await persistence.setLibraryStatus(pick.anilistId, status);
     const convo = await ensureConvo();
     const reply = libraryDoneReply(animeTitle(pick), status, polish);
     await memoryService.appendMessage(convo.id, "assistant", reply);
-    setMessages((prev) => [
-      ...prev,
-      { role: "assistant", content: reply },
-    ]);
+    setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
   }
 
   async function send(textRaw?: string) {
     const text = (textRaw ?? input).trim();
     if (!text || sending) return;
+
+    const polishHint = looksPolish(text);
+    const spam = checkMessageSpam(text);
+    if (!spam.ok && spam.reason) {
+      if (!textRaw) setInput("");
+      const reply = spamReply(spam.reason, polishHint);
+      setMessages((prev) => [
+        ...prev,
+        { role: "user", content: text },
+        { role: "assistant", content: reply },
+      ]);
+      return;
+    }
+
     setSending(true);
     if (!textRaw) setInput("");
 
