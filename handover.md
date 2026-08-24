@@ -1,7 +1,7 @@
 # Anime Buddy — Handover
 
 **Date:** 2026-08-24  
-**App version:** `0.3.12`  
+**App version:** `0.3.13`  
 **Live:** https://megabomb420.github.io/anime-buddy/  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev
 
@@ -76,6 +76,7 @@ Expect:
 | 7 | Taste DNA blurb (Worker `analyzeTaste` on Profile rebuild) | **Shipped 0.3.12** |
 | 8 | Spoiler level (settings + prompt) | **Shipped 0.3.12** |
 | — | Library queries from chat (`what am I watching`) | **Shipped 0.3.12** |
+| — | **Home For you** (ratings + library → AniList pool) | **Shipped 0.3.13** |
 | 9 | Session summary every N turns (token save) | Later |
 | 10 | Compare two catalog titles side by side | Later |
 | — | **AniList facts in chat** (PWA pre-fetch) | **Shipped 0.3.11** |
@@ -103,7 +104,7 @@ Ren does **not** invent catalog facts. The PWA looks titles up (`src/lib/buddy-c
 
 ## If “nothing changed” on the phone
 
-1. Home footer must show **`v0.3.12`** (or newer).  
+1. Home footer must show **`v0.3.13`** (or newer).  
 2. Else clear site data for `megabomb420.github.io` (stale PWA SW).  
 3. `curl -s https://megabomb420.github.io/anime-buddy/version.json`
 
@@ -125,6 +126,10 @@ Persona lock client + Worker. Spam guard client-side.
 ### Featured
 
 Top 8 trending, 45s rotate, dots to jump.
+
+### For you (Home)
+
+Deterministic rank (`src/lib/taste-rank.ts`): ratings, completed/watching, dropped, favorites → genre weights. Candidate pool is AniList only (per-title recommendations + top genres + trending). Library ids excluded. No DeepSeek, no invented titles. Empty until the user rates or logs something.
 
 ### Deploy
 

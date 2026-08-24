@@ -120,6 +120,10 @@ export default function HomePage() {
   const [trending, setTrending] = useState<AnimeSummary[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const [forYou, setForYou] = useState<AnimeSummary[]>([]);
+  const [forYouKicker, setForYouKicker] = useState("From your library");
+  const [forYouEmpty, setForYouEmpty] = useState<"no-taste" | "no-matches" | null>(null);
+  const [forYouLoading, setForYouLoading] = useState(true);
   const poolLenRef = useRef(0);
 
   const featuredPool = useMemo(
@@ -158,6 +162,21 @@ export default function HomePage() {
         if (anime) cw.push({ anime, progress: entry.progress });
       }
       setContinueWatching(cw);
+    })();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const result = await recommendationService.forYou(12);
+        setForYou(result.items);
+        setForYouKicker(result.kicker);
+        setForYouEmpty(result.empty ?? null);
+      } catch {
+        setForYouEmpty("no-matches");
+      } finally {
+        setForYouLoading(false);
+      }
     })();
   }, []);
 
@@ -266,6 +285,19 @@ export default function HomePage() {
           loading={catalogLoading}
           size="lg"
         />
+      </section>
+
+      <section className="mt-8">
+        <SectionHeader title="For you" kicker={forYouKicker} href="/discover" />
+        {forYouLoading || forYou.length > 0 ? (
+          <PosterRow items={forYou} loading={forYouLoading} size="lg" />
+        ) : (
+          <p className="px-4 text-sm text-muted-foreground">
+            {forYouEmpty === "no-taste"
+              ? "Rate or log a few titles. This row is scored from your library — AniList supplies the names."
+              : "Nothing ranked yet. Rate a title in Library or Discover."}
+          </p>
+        )}
       </section>
 
       <div className="mx-auto max-w-md space-y-8 px-4 pt-8">

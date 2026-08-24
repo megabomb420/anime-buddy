@@ -1,6 +1,6 @@
 # Anime Buddy
 
-**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.12**
+**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.13**
 
 **Source:** [github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
 
@@ -14,7 +14,7 @@ UI chrome is **English**. Ren still answers Polish in Polish.
 
 | Screen | What you get |
 | --- | --- |
-| **Home** | Featured hero (rotates every 45s, dots to jump), trending, tonight picks. **App version + Update** at the bottom. |
+| **Home** | Featured hero (rotates every 45s, dots to jump), trending, **For you** (scored from ratings + library + AniList recs), tonight picks. **App version + Update** at the bottom. |
 | **Discover** | Live search from 2 letters (covers). Trending / Seasonal / Popular. iOS safe-area header. |
 | **Scan** | Camera or photo of a figurine / character art → AniList match |
 | **Library** | Watching, want to watch, completed. Same safe-area as Discover. |

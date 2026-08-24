@@ -308,4 +308,39 @@ export class AniListProvider implements CatalogProvider {
       cachedAt: Date.now(),
     }));
   }
+
+  async getByGenre(genre: string, limit = 16): Promise<AnimeSummary[]> {
+    const data = await gql<{ Page: { media: AnilistMedia[] } }>(
+      `query ($genre: String!, $perPage: Int!) {
+        Page(perPage: $perPage) {
+          media(type: ANIME, genre: $genre, sort: POPULARITY_DESC) { ${ANIME_FIELDS} }
+        }
+      }`,
+      { genre, perPage: limit },
+    );
+    return data.Page.media.map(toSummary);
+  }
+
+  async getRecommended(anilistId: number, limit = 8): Promise<AnimeSummary[]> {
+    const data = await gql<{
+      Media: {
+        recommendations?: {
+          nodes?: Array<{ mediaRecommendation?: AnilistMedia | null } | null> | null;
+        } | null;
+      } | null;
+    }>(
+      `query ($id: Int!, $perPage: Int!) {
+        Media(id: $id, type: ANIME) {
+          recommendations(sort: RATING_DESC, perPage: $perPage) {
+            nodes { mediaRecommendation { ${ANIME_FIELDS} } }
+          }
+        }
+      }`,
+      { id: anilistId, perPage: limit },
+    );
+    return (data.Media?.recommendations?.nodes ?? [])
+      .map((n) => n?.mediaRecommendation)
+      .filter((m): m is AnilistMedia => Boolean(m?.id))
+      .map(toSummary);
+  }
 }

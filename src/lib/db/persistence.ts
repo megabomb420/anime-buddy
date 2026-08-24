@@ -12,6 +12,7 @@ import type {
   AnimeRating,
   CharacterDNA,
   CharacterRecord,
+  FavoriteAnime,
   Conversation,
   CrunchyrollAvailabilityRecord,
   ExternalIdMapping,
@@ -195,6 +196,14 @@ export const persistence = {
 
   async getAnimeRating(anilistId: number): Promise<AnimeRating | undefined> {
     return db.animeRatings.get(anilistId);
+  },
+
+  async getAnimeRatings(): Promise<AnimeRating[]> {
+    return db.animeRatings.toArray();
+  },
+
+  async getFavoriteAnime(): Promise<FavoriteAnime[]> {
+    return db.favoriteAnime.toArray();
   },
 
   async setProgress(anilistId: number, episode: number): Promise<void> {

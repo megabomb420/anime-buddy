@@ -123,6 +123,29 @@ export class AnimeCatalogService {
     return results;
   }
 
+  async getByGenre(genre: string, limit = 16): Promise<AnimeSummary[]> {
+    const key = `genre:${genre.toLowerCase()}:${limit}`;
+    const cached = recall(key);
+    if (cached) return cached;
+    const anilist = providers.catalog as unknown as {
+      getByGenre(genre: string, limit?: number): Promise<AnimeSummary[]>;
+    };
+    if (typeof anilist.getByGenre !== "function") return [];
+    const results = await anilist.getByGenre(genre, limit);
+    void Promise.all(results.map((r) => persistence.cacheAnime(r)));
+    return remember(key, results);
+  }
+
+  async getRecommended(anilistId: number, limit = 8): Promise<AnimeSummary[]> {
+    const anilist = providers.catalog as unknown as {
+      getRecommended(anilistId: number, limit?: number): Promise<AnimeSummary[]>;
+    };
+    if (typeof anilist.getRecommended !== "function") return [];
+    const results = await anilist.getRecommended(anilistId, limit);
+    void Promise.all(results.map((r) => persistence.cacheAnime(r)));
+    return results;
+  }
+
   async searchCharacters(query: string, limit = 8): Promise<CharacterSummary[]> {
     const results = await providers.catalog.searchCharacters(query, limit);
     void Promise.all(results.map((c) => persistence.cacheCharacter(c)));

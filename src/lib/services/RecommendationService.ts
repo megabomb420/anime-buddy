@@ -21,11 +21,25 @@ import { passesContentPolicy } from "@/lib/age/normalize";
 import { isConfirmedOnCrunchyroll } from "@/lib/availability/resolve";
 import { isVagueCatalogQuery } from "@/lib/buddy-intent";
 import { persistence } from "@/lib/db/persistence";
+import { animeTitle } from "@/lib/media";
 import { providers } from "@/lib/providers";
+import {
+  buildTasteWeights,
+  pickForYou,
+  topGenres,
+  type SeedBoost,
+  type TasteAnchor,
+} from "@/lib/taste-rank";
 import type { HardConstraints } from "@/types/ai";
 import type { AnimeSummary } from "@/types/anime";
 import type { RecommendationItem, RecommendationRecord } from "@/types/entities";
 import { animeCatalogService } from "./AnimeCatalogService";
+
+export interface ForYouResult {
+  items: AnimeSummary[];
+  kicker: string;
+  empty?: "no-taste" | "no-matches";
+}
 
 export interface RecommendOptions {
   query: string;
@@ -231,6 +245,122 @@ export class RecommendationService {
       reason: `Matched your taste profile (local score ${s.score.toFixed(2)}).`,
       score: s.score,
     }));
+  }
+
+  /**
+   * Home "For you" row. Seeds from ratings / library, candidates from AniList
+   * (recommendations + genre lists + trending). No invented titles.
+   */
+  async forYou(limit = 12): Promise<ForYouResult> {
+    const [library, ratings, favorites, settings] = await Promise.all([
+      persistence.getLibrary(),
+      persistence.getAnimeRatings(),
+      persistence.getFavoriteAnime(),
+      persistence.getSettings(),
+    ]);
+
+    const ratingMap = new Map(ratings.map((r) => [r.anilistId, r.score]));
+    const favSet = new Set(favorites.map((f) => f.anilistId));
+    const exclude = new Set(library.map((e) => e.anilistId));
+
+    const anchors: TasteAnchor[] = [];
+    const seenAnchor = new Set<number>();
+
+    const pushAnchor = async (anilistId: number, status?: TasteAnchor["status"]) => {
+      if (seenAnchor.has(anilistId)) return;
+      const cached =
+        (await persistence.getCachedAnime(anilistId)) ??
+        (await animeCatalogService.getAnime(anilistId));
+      if (!cached) return;
+      seenAnchor.add(anilistId);
+      anchors.push({
+        anilistId,
+        title: animeTitle(cached),
+        genres: cached.genres,
+        tags: cached.tags,
+        rating: ratingMap.get(anilistId),
+        status,
+        favorite: favSet.has(anilistId),
+      });
+    };
+
+    for (const e of library) await pushAnchor(e.anilistId, e.status);
+    for (const r of ratings) await pushAnchor(r.anilistId);
+    for (const f of favorites) await pushAnchor(f.anilistId);
+
+    const hasTaste = anchors.some(
+      (a) => a.rating != null || a.status === "completed" || a.status === "watching" || a.favorite,
+    );
+    if (!hasTaste) {
+      return { items: [], kicker: "From your library", empty: "no-taste" };
+    }
+
+    const weights = buildTasteWeights(anchors);
+    const genres = topGenres(weights, 3);
+    const seeds = [...anchors]
+      .filter((a) => (a.rating ?? 0) >= 7.5 || a.favorite || a.status === "completed")
+      .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+      .slice(0, 4);
+
+    const seedBoost = new Map<number, SeedBoost>();
+    const recPools = await Promise.all(
+      seeds.map(async (seed) => {
+        try {
+          const recs = await animeCatalogService.getRecommended(seed.anilistId, 8);
+          const because = seed.title ?? `title #${seed.anilistId}`;
+          for (const rec of recs) {
+            if (exclude.has(rec.anilistId)) continue;
+            const prev = seedBoost.get(rec.anilistId);
+            const next: SeedBoost = { score: Math.max(prev?.score ?? 0, 0.85), because: prev?.because ?? because };
+            seedBoost.set(rec.anilistId, next);
+          }
+          return recs;
+        } catch {
+          return [] as AnimeSummary[];
+        }
+      }),
+    );
+
+    const genreLabel = (key: string) => {
+      for (const a of anchors) {
+        const hit = a.genres.find((g) => g.toLowerCase() === key);
+        if (hit) return hit;
+      }
+      return key.charAt(0).toUpperCase() + key.slice(1);
+    };
+
+    const genrePools = await Promise.all(
+      genres.map(async (g) => {
+        try {
+          return await animeCatalogService.getByGenre(genreLabel(g), 12);
+        } catch {
+          return [] as AnimeSummary[];
+        }
+      }),
+    );
+
+    let discovery: AnimeSummary[] = [];
+    try {
+      discovery = await this.discoveryPool(24);
+    } catch {
+      discovery = [];
+    }
+
+    const pool = uniqueAnime([...recPools.flat(), ...genrePools.flat(), ...discovery]);
+    const filtered = pool.filter((c) =>
+      passesContentPolicy(c.ageGuide, c.isAdult, {
+        contentVisibility: settings.contentVisibility,
+        maxAge: settings.maxAge,
+      }),
+    );
+
+    const items = pickForYou(filtered, { weights, exclude, seedBoost }, limit);
+    if (!items.length) {
+      return { items: [], kicker: "From your ratings", empty: "no-matches" };
+    }
+
+    const kicker = seeds[0]?.title ? `Because you liked ${seeds[0].title}` : "From your ratings";
+    return { items, kicker };
   }
 
   /** Record feedback on a recommendation — feeds back into taste signals. */
