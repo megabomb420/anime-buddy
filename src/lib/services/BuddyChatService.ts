@@ -1,9 +1,8 @@
 import { providers } from "@/lib/providers";
 import { getWorkerUrl } from "@/lib/worker-gateway";
 import {
+  blockUser,
   guardReply,
-  isJailbreakAttempt,
-  lockedReply,
   looksPolish,
   mockBuddyReply,
   sanitizeMessages,
@@ -20,7 +19,8 @@ export async function replyAsBuddy(
 ): Promise<string> {
   const clean = sanitizeMessages(messages);
   const last = [...clean].reverse().find((m) => m.role === "user")?.content ?? "";
-  if (isJailbreakAttempt(last)) return lockedReply(last);
+  const blocked = blockUser(last);
+  if (blocked) return blocked;
 
   if (getWorkerUrl()) {
     try {

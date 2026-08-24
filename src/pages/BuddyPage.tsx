@@ -75,7 +75,7 @@ export default function BuddyPage() {
       <div className="flex-1 space-y-3">
         {messages.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            I'm Buddy. Ask me what to watch. I stay me — that's the deal.
+            I'm Ren. Night couch, anime only. Math and side quests bounce — ask me what to watch.
           </p>
         )}
         {messages.map((m, i) => (

@@ -22,10 +22,9 @@
  */
 
 import {
+  blockUser,
   buildSystemPrompt,
   guardReply,
-  isJailbreakAttempt,
-  lockedReply,
   sanitizeMessages,
   type BuddyContext,
   type ChatMessage,
@@ -233,8 +232,9 @@ export default {
             const messages = sanitizeMessages(body.messages);
             const context = (body.context ?? {}) as BuddyContext;
             const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
-            if (isJailbreakAttempt(lastUser)) {
-              return json({ reply: lockedReply(lastUser) }, { status: 200 }, cors);
+            const blocked = blockUser(lastUser);
+            if (blocked) {
+              return json({ reply: blocked }, { status: 200 }, cors);
             }
             const system = buildSystemPrompt(context);
             const reply = await deepseekBuddyChat(env, system, messages);
