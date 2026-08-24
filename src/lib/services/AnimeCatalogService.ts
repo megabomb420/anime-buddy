@@ -1,25 +1,22 @@
 /**
  * AnimeCatalogService — composes the catalog providers into one application
- *-facing API and owns caching. The catalog layer is independent from AI:
+ * facing API and owns caching. The catalog layer is independent from AI:
  * everything here is deterministic.
- *
- * Responsibilities:
- *   - search/get anime via AniList (canonical identity)
- *   - persist id mappings (AniList ↔ MAL ↔ TMDB)
- *   - lazily fetch + cache MAL extras (score, rating)
- *   - resolve + cache age guides (TMDB > MAL > AniList guard)
- *   - resolve + cache Crunchyroll availability
  */
 
 import { resolveAgeGuide } from "@/lib/age/normalize";
 import { resolveAvailability } from "@/lib/availability/resolve";
+import {
+  rankByTitleMatch,
+  searchQueryVariants,
+  scoreTitleMatch,
+} from "@/lib/catalog-search";
 import { persistence } from "@/lib/db/persistence";
 import { providers } from "@/lib/providers";
 import type { AnimeSummary, CharacterSummary } from "@/types/anime";
 
-/** How long cached MAL extras / availability stay fresh. */
-const MAL_EXTRAS_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-const AVAILABILITY_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
+const MAL_EXTRAS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const AVAILABILITY_TTL_MS = 24 * 60 * 60 * 1000;
 const SEARCH_TTL_MS = 60 * 1000;
 const searchMemo = new Map<string, { at: number; items: AnimeSummary[] }>();
 
@@ -37,24 +34,45 @@ function recall(key: string): AnimeSummary[] | null {
   return null;
 }
 
+function uniqueById(list: AnimeSummary[]): AnimeSummary[] {
+  const seen = new Set<number>();
+  const out: AnimeSummary[] = [];
+  for (const a of list) {
+    if (seen.has(a.anilistId)) continue;
+    seen.add(a.anilistId);
+    out.push(a);
+  }
+  return out;
+}
+
 export class AnimeCatalogService {
   async search(query: string, limit = 20): Promise<AnimeSummary[]> {
     const key = `${query.trim().toLowerCase()}:${limit}`;
     const hit = searchMemo.get(key);
     if (hit && Date.now() - hit.at < SEARCH_TTL_MS) return hit.items;
 
-    const results = await providers.catalog.searchAnime(query, limit);
+    const variants = searchQueryVariants(query);
+    const batches = await Promise.all(
+      variants.slice(0, 4).map((v) =>
+        providers.catalog.searchAnime(v, Math.max(limit, 12)).catch(() => [] as AnimeSummary[]),
+      ),
+    );
+    let merged = uniqueById(batches.flat());
+    merged = rankByTitleMatch(query, merged);
+
+    // Prefer real matches; if AniList returned noise, still keep ranked list.
+    const strong = merged.filter((a) => scoreTitleMatch(query, a) >= 50);
+    const results = (strong.length > 0 ? strong : merged).slice(0, limit);
+
     searchMemo.set(key, { at: Date.now(), items: results });
     if (searchMemo.size > 40) {
       const oldest = searchMemo.keys().next().value;
       if (oldest) searchMemo.delete(oldest);
     }
-    // Cache in the background; search latency shouldn't wait for IDB.
     void Promise.all(results.map((r) => persistence.cacheAnime(r)));
     return results;
   }
 
-  /** Get anime by AniList id — cache-first, then AniList. */
   async getAnime(anilistId: number): Promise<AnimeSummary | null> {
     const cached = await persistence.getCachedAnime(anilistId);
     if (cached) return cached;
@@ -110,10 +128,6 @@ export class AnimeCatalogService {
     return fresh;
   }
 
-  /**
-   * Enrich an anime with lazily-fetched MAL extras (score + rating).
-   * Cached for MAL_EXTRAS_TTL_MS; never blocks the main render path.
-   */
   async enrichWithMalExtras(anime: AnimeSummary): Promise<AnimeSummary> {
     if (!anime.malId) return anime;
     const cached = await persistence.getCachedAnime(anime.anilistId);
@@ -134,14 +148,10 @@ export class AnimeCatalogService {
       await persistence.cacheAnime(merged);
       return merged;
     } catch {
-      return anime; // Jikan failure must never break the UI
+      return anime;
     }
   }
 
-  /**
-   * Resolve the age guide for an anime following the priority:
-   * TMDB (region) > TMDB (other, labeled) > MAL rating > AniList adult guard.
-   */
   async resolveAgeGuideFor(anime: AnimeSummary, region: string): Promise<AnimeSummary> {
     const cached = await persistence.getAgeGuide(anime.anilistId, region);
     if (cached) return { ...anime, ageGuide: cached.guide };
@@ -155,7 +165,7 @@ export class AnimeCatalogService {
         tmdbSelected = certs.find((c) => c.country === region);
         tmdbOthers = certs.filter((c) => c.country !== region);
       } catch {
-        // Worker/TMDB unavailable — fall through to MAL/AniList sources.
+        /* fall through */
       }
     }
 
@@ -178,10 +188,6 @@ export class AnimeCatalogService {
     return { ...anime, ageGuide: guide };
   }
 
-  /**
-   * Resolve Crunchyroll availability for a region from AniList signals +
-   * TMDB watch providers. Never asks the AI; never scrapes Crunchyroll.
-   */
   async resolveAvailabilityFor(anime: AnimeSummary, region: string): Promise<AnimeSummary> {
     const cached = await persistence.getAvailability(anime.anilistId, region);
     if (cached && Date.now() - cached.checkedAt < AVAILABILITY_TTL_MS) {
@@ -209,7 +215,7 @@ export class AnimeCatalogService {
           });
         }
       } catch {
-        tmdbDataAvailable = false; // Worker not configured/reachable
+        tmdbDataAvailable = false;
       }
     }
 
