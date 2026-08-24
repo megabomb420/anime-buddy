@@ -1,3 +1,4 @@
+import { useRef, type TouchEvent } from "react";
 import { Link } from "react-router";
 import { Info, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,9 @@ import { AgeBadge } from "@/components/AgeBadge";
 import { anilistScore10, animeTitle, formatLabel, seasonLabel } from "@/lib/media";
 import { PosterImage } from "./Poster";
 import type { AnimeSummary } from "@/types/anime";
+
+/** Min horizontal distance (px) for a hero swipe; vertical scroll stays scroll. */
+const SWIPE_MIN_PX = 48;
 
 export function FeaturedHero({
   anime,
@@ -21,6 +25,7 @@ export function FeaturedHero({
   const score = anilistScore10(anime.anilistScore);
   const cover = anime.coverImage;
   const banner = anime.bannerImage;
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const native =
     anime.title.native && anime.title.native !== title
       ? anime.title.native
@@ -28,8 +33,31 @@ export function FeaturedHero({
         ? anime.title.romaji
         : undefined;
 
+  function onTouchStart(e: TouchEvent) {
+    const t = e.touches[0];
+    touchStart.current = t ? { x: t.clientX, y: t.clientY } : null;
+  }
+
+  function onTouchEnd(e: TouchEvent) {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || total < 2 || !onSelectIndex) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+    // Swipe left → next title, swipe right → previous.
+    const next = dx < 0 ? (index + 1) % total : (index - 1 + total) % total;
+    onSelectIndex(next);
+  }
+
   return (
-    <section className="relative isolate h-[min(78dvh,640px)] min-h-[460px] overflow-hidden">
+    <section
+      className="relative isolate h-[min(78dvh,640px)] min-h-[460px] overflow-hidden"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       <div className="absolute inset-0 overflow-hidden">
         <div className="hero-art">
           <PosterImage

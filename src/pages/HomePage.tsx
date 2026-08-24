@@ -34,7 +34,7 @@ const TONIGHT_OPTIONS = [
 ];
 
 /** How often Featured cycles through the trending pool. */
-const FEATURED_ROTATE_MS = 20_000;
+const FEATURED_ROTATE_MS = 10_000;
 const FEATURED_POOL_SIZE = 8;
 
 function RecommendationCard({
@@ -120,6 +120,7 @@ export default function HomePage() {
   const [selectedMinutes, setSelectedMinutes] = useState<number | null>(null);
   const [trending, setTrending] = useState<AnimeSummary[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
+  const [heroEpoch, setHeroEpoch] = useState(0);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [forYou, setForYou] = useState<AnimeSummary[]>([]);
   const [forYouReasons, setForYouReasons] = useState<Record<number, string>>({});
@@ -244,7 +245,13 @@ export default function HomePage() {
       clear();
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [featuredPool.length]);
+  }, [featuredPool.length, heroEpoch]);
+
+  /** Manual hero pick (dots or swipe) — also restarts the auto-rotate timer. */
+  function selectHero(i: number) {
+    setHeroIndex(i);
+    setHeroEpoch((e) => e + 1);
+  }
 
   async function loadTonight(minutes: number) {
     setSelectedMinutes(minutes);
@@ -304,7 +311,7 @@ export default function HomePage() {
           anime={hero}
           index={heroIndex % Math.max(featuredPool.length, 1)}
           total={featuredPool.length}
-          onSelectIndex={setHeroIndex}
+          onSelectIndex={selectHero}
         />
       ) : null}
 
