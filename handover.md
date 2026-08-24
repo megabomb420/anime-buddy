@@ -1,8 +1,8 @@
 # Anime Buddy — Handover (for the next agent)
 
 **Date:** 2026-08-24  
-**App version:** `0.3.15` (live)  
-**HEAD:** `main` @ 0.3.15 (see `git log -1`)  
+**App version:** `0.3.16` (live)  
+**HEAD:** `main` @ 0.3.16 (see `git log -1`)  
 **Live PWA:** https://megabomb420.github.io/anime-buddy/  
 **Source:** https://github.com/megabomb420/anime-buddy  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev  
@@ -38,7 +38,7 @@ Order in `src/pages/BuddyPage.tsx` `send()`:
 1. **WRITE** — library / rate / progress (incl. comma / `and` / `i` lists) → AniList search → Confirm cards → IndexedDB. **No DeepSeek.**
 2. **LIBRARY READ** — `what am I watching` / `co oglądam` / `my library` → IndexedDB cards. **No DeepSeek.**
 3. **LOOKUP** — `znajdź` / `find` / bare title → catalog cards. **No DeepSeek.**
-4. **CHAT** — rec / facts / free talk → PWA prefetches AniList (`buddy-catalog.ts`) + optional `RecommendationService` → stream DeepSeek with `catalogFacts` / `libraryBrief` / `tasteSummary` / `spoilerLimits`.
+4. **CHAT** — rec / facts / free talk → PWA prefetches AniList (`buddy-catalog.ts`) + optional `RecommendationService` → stream DeepSeek with `catalogFacts` / `libraryBrief` / `tasteSummary` / `spoilerLimits`. Long chats go through `buddy-session.ts` first: turns older than the last 11 collapse into one `[Earlier in this chat — recap]` message (deterministic — only echoes parsed user intents), so the Worker never sees more than 12 messages.
 
 Persona lock: client (`src/lib/buddy/persona.ts`) **and** Worker (`worker/src/persona.ts`). Keep them in sync. Spam guard is client-side. User must confirm all library/rating writes.
 
@@ -50,13 +50,13 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 
 | Surface | State |
 | --- | --- |
-| Pages | **v0.3.15** — `version.json` must match `package.json` |
+| Pages | **v0.3.16** — `version.json` must match `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live (CLI deploy). Persona includes spoiler lock. |
 | Worker GitHub Action | **Still fails** — `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` empty |
 | Owner CLI | `wrangler` logged in as `przemek.fall@gmail.com` / account Whip Blanket. `cd worker && npx wrangler deploy` works on that machine |
 
-If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.14**.
+If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.16**.
 
 ```bash
 curl -s https://megabomb420.github.io/anime-buddy/version.json
@@ -76,6 +76,7 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.13 | Home **For you** row — ratings + library → AniList pool, ranked in `src/lib/taste-rank.ts` |
 | 0.3.14 | **For you** polish — reason under each poster, Refresh cycles next-best titles, Interested / Not for me tap feedback via `recordFeedback` (`forYou()` returns `reasons`, takes `excludeIds`) |
 | 0.3.15 | **Tonight** no longer Crunchyroll-first (`requireCrunchyroll: false`, same as Ren recs) → picks always render; Featured hero rotates every **20s** |
+| 0.3.16 | **Session recap** — `src/lib/buddy-session.ts`: chats longer than 12 messages send a deterministic `[Earlier in this chat — recap]` (logged / rated / looked-up / rec asks) + last 11 verbatim to the Worker. Token save without Ren forgetting; no Worker change |
 
 Worker tools + SSE health went live via CLI (not CI).
 
@@ -90,6 +91,7 @@ Worker tools + SSE health went live via CLI (not CI).
 | `src/lib/buddy-library.ts` | Write + library-read parsers, title split |
 | `src/lib/catalog-search.ts` | Title normalize (`×`→` x `), lookup, rank |
 | `src/lib/buddy-catalog.ts` + `buddy-catalog-ask.ts` | Prefetch AniList facts for CHAT |
+| `src/lib/buddy-session.ts` | Recap of older chat turns → Worker never sees > 12 messages (unit-tested) |
 | `src/lib/buddy/persona.ts` | Client lock + system prompt |
 | `src/lib/taste-rank.ts` | Deterministic For-you scoring (unit-tested) |
 | `src/lib/services/RecommendationService.ts` | Rec pipeline + `forYou()` |
@@ -101,7 +103,7 @@ Worker tools + SSE health went live via CLI (not CI).
 Tests (no npm test script):
 
 ```bash
-node --experimental-strip-types --test src/lib/buddy-library.test.ts src/lib/buddy/persona.test.ts src/lib/buddy-catalog.test.ts src/lib/buddy-intent.test.ts src/lib/taste-rank.test.ts
+node --experimental-strip-types --test src/lib/buddy-library.test.ts src/lib/buddy/persona.test.ts src/lib/buddy-catalog.test.ts src/lib/buddy-intent.test.ts src/lib/taste-rank.test.ts src/lib/catalog-search.test.ts src/lib/buddy-session.test.ts
 node node_modules/typescript/bin/tsc -b --pretty false
 ```
 
@@ -141,10 +143,9 @@ If you lack Cloudflare credentials: say so. Do not pretend it deployed. CI Worke
 
 Suggested order, small PRs:
 
-1. **Session summary every N turns** (roadmap #9) — token save; still no invented catalog facts.
-2. **Compare two catalog titles** (roadmap #10) — AniList ids only, side by side cards.
-3. **Worker CI secrets** — tell the user to add `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; do not invent a deploy.
-4. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
+1. **Compare two catalog titles** (roadmap #10) — AniList ids only, side by side cards.
+2. **Worker CI secrets** — tell the user to add `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`; do not invent a deploy.
+3. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
 
 Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 

@@ -29,6 +29,7 @@ import {
 } from "@/lib/buddy-library";
 import { parseBareTitleQuery, parseLookupQuery, resolveTitleMatch } from "@/lib/catalog-search";
 import { factsFromPicks, resolveBuddyCatalog } from "@/lib/buddy-catalog";
+import { buildSessionHistory } from "@/lib/buddy-session";
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { animeTitle } from "@/lib/media";
 import { looksPolish } from "@/lib/buddy/persona";
@@ -463,7 +464,7 @@ export default function BuddyPage() {
       };
 
       const reply = await streamAsBuddy(
-        next.map((m) => ({ role: m.role, content: m.content })),
+        buildSessionHistory(next.map((m) => ({ role: m.role, content: m.content }))),
         {
           catalogPicks: picks.map((p) => ({
             title: animeTitle(p),
