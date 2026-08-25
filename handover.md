@@ -1,8 +1,8 @@
 # Anime Buddy — Handover (for the next agent)
 
 **Date:** 2026-08-25  
-**App version:** `0.3.34`<br>
-**Release commit:** `3b030e8` — Ship 0.3.34: align Ren cards and expose features<br>
+**App version:** `0.3.35`<br>
+**Release:** v0.3.35 — simplified bottom navigation; use `git log -1` for the commit SHA<br>
 **Live PWA:** https://megabomb420.github.io/anime-buddy/  
 **Source:** https://github.com/megabomb420/anime-buddy  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev  
@@ -50,13 +50,13 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 
 | Surface | State |
 | --- | --- |
-| Pages | **v0.3.34 live** — verified 2026-08-25; `version.json` matches `package.json` |
+| Pages | **v0.3.35** — `version.json` must match `package.json` after the Pages workflow completes |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live. Persona includes spoiler lock and Ren/card alignment. |
 | Worker GitHub Action | Green for `3b030e8` (run 10, 2026-08-25). It runs on `worker/**` changes or manually. Secrets live in Settings → Secrets → **Actions**. Token scope: Cloudflare **Edit Cloudflare Workers** template |
 | Owner CLI | `wrangler` owner login works as a fallback; CI is primary. Do not put account emails or IDs in this public file. |
 
-If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.34**.
+If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.35**.
 
 ```bash
 curl -s https://megabomb420.github.io/anime-buddy/version.json
@@ -95,6 +95,7 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.32 | **This week rail on Home** — next episodes of watching **and** plan-to-watch titles airing within 7 days (`AIRING_WEEK_MS`), sorted by air time, max 12 posters. New `airingWeekdayLabel` in `airing.ts` ("out now" / "today" / "tomorrow" / "Fri", unit-tested). Airing query now covers the whole watching+PTW list, not just Continue Watching |
 | 0.3.33 | **Shareable Taste DNA card** — Profile → Taste DNA → **Share** renders a 1080×1350 PNG on a canvas (summary blurb + top-5 genre bars + completed/avg/hours stats + footer URL), then `navigator.share` with files or PNG download fallback. `src/lib/taste-card.ts` (canvas) + `src/lib/taste-card-text.ts` (pure `wrapWords`/`clampLines`, unit-tested). AbortError from a cancelled share sheet is swallowed quietly |
 | 0.3.34 | **Ren/card alignment + feature discoverability** — recommendation candidates no longer render automatically. `buddy-card-selection.ts` attaches only titles Ren explicitly names; recommendation turns require an immediate 1–3 title answer using exact AniList names; card-side AI reasons were removed; normal watch-now recs exclude `NOT_YET_RELEASED`/`CANCELLED`. Profile is now in bottom nav, inactive Scan no longer looks selected, Home exposes Taste DNA + Characters, Profile has section shortcuts, and active chats keep quick actions visible. |
+| 0.3.35 | **Simpler bottom navigation** — Scan is no longer a permanent tab. The bottom bar is Home, Discover, Library, Buddy and Profile; Home and Profile expose **Scan poster or screenshot** as a contextual action. Profile moves the Scan + Buddy connection card to the very end. |
 
 Worker CI is primary; owner CLI deploy remains the fallback.
 

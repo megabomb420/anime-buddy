@@ -414,7 +414,7 @@ export default function HomePage() {
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { icon: Camera, label: "Scan", to: "/scan" },
+            { icon: Camera, label: "Scan poster or screenshot", to: "/scan" },
             { icon: Compass, label: "Discover", to: "/discover" },
             { icon: MessageCircle, label: "Ask Buddy", to: "/buddy" },
             { icon: Dna, label: "Taste DNA", to: "/profile#taste" },

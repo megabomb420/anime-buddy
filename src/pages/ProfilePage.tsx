@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
   BarChart3,
+  Camera,
   Download,
   EyeOff,
   Library,
@@ -307,8 +308,6 @@ export default function ProfilePage() {
         ))}
       </nav>
 
-      <VisionGatewayCard />
-
       {stats && (
         <section className="space-y-3">
           <h2 className="font-medium flex items-center gap-2">
@@ -534,6 +533,11 @@ export default function ProfilePage() {
         <h2 className="font-medium">Quick Links</h2>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">
+            <Link to="/scan">
+              <Camera className="mr-1 h-4 w-4" /> Scan poster or screenshot
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
             <Link to="/library">
               <Library className="mr-1 h-4 w-4" /> Library
             </Link>
@@ -671,6 +675,8 @@ export default function ProfilePage() {
           )}
         </div>
       </section>
+
+      <VisionGatewayCard />
     </div>
   );
 }

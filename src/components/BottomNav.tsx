@@ -1,17 +1,16 @@
-import { Camera, Compass, Home, Library, MessageCircle, UserRound } from "lucide-react";
+import { Compass, Home, Library, MessageCircle, UserRound } from "lucide-react";
 import { NavLink, useLocation } from "react-router";
 import { cn } from "@/lib/utils";
 
 const items = [
   { to: "/", label: "Home", icon: Home, end: true },
   { to: "/discover", label: "Discover", icon: Compass },
-  { to: "/scan", label: "Scan", icon: Camera, scan: true },
   { to: "/library", label: "Library", icon: Library },
   { to: "/buddy", label: "Buddy", icon: MessageCircle },
   { to: "/profile", label: "Profile", icon: UserRound },
 ] as const;
 
-/** Mobile bottom navigation with a center Scan action. */
+/** Mobile bottom navigation for the five primary destinations. */
 export function BottomNav() {
   const { pathname } = useLocation();
   if (pathname === "/scan" || pathname.startsWith("/anime/") || pathname.startsWith("/character/")) {
@@ -23,37 +22,6 @@ export function BottomNav() {
       <div className="mx-auto flex max-w-md items-end justify-between px-1">
         {items.map((item) => {
           const Icon = item.icon;
-          if ("scan" in item && item.scan) {
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                aria-label="Scan"
-                className={({ isActive }) =>
-                  cn(
-                    "-mt-5 flex min-h-12 flex-1 flex-col items-center justify-end gap-0.5 pb-1.5 text-[10px]",
-                    isActive ? "text-foreground" : "text-muted-foreground",
-                  )
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span
-                      className={cn(
-                        "flex size-14 items-center justify-center rounded-full border shadow-lg transition-colors",
-                        isActive
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-secondary text-muted-foreground",
-                      )}
-                    >
-                      <Camera className="size-6" strokeWidth={1.8} />
-                    </span>
-                    Scan
-                  </>
-                )}
-              </NavLink>
-            );
-          }
           return (
             <NavLink
               key={item.to}
