@@ -11,6 +11,7 @@ import {
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -23,6 +24,9 @@ import { Badge } from "@/components/ui/badge";
 import { VisionGatewayCard } from "@/components/VisionGatewayCard";
 import { persistence } from "@/lib/db/persistence";
 import { db } from "@/lib/db/database";
+import { toast } from "sonner";
+import { applyAniListImport } from "@/lib/anilist-import-apply";
+import { fetchAniListList, type AniListImportPreview } from "@/lib/anilist-import";
 import { tasteService } from "@/lib/services/TasteService";
 import type {
   ContentVisibility,
@@ -55,6 +59,42 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [versionCheck, setVersionCheck] = useState<VersionCheck | null>(null);
   const [rebuildingTaste, setRebuildingTaste] = useState(false);
+  const [importName, setImportName] = useState("");
+  const [importPreview, setImportPreview] = useState<AniListImportPreview | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
+
+  async function previewImport() {
+    if (importBusy) return;
+    setImportBusy(true);
+    setImportError(null);
+    setImportPreview(null);
+    try {
+      setImportPreview(await fetchAniListList(importName));
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Import failed.");
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
+  async function applyImport() {
+    if (!importPreview || importBusy) return;
+    setImportBusy(true);
+    setImportError(null);
+    try {
+      await applyAniListImport(importPreview, (done, total) => setImportProgress({ done, total }));
+      toast(`Imported ${importPreview.entries.length} titles from AniList`);
+      setImportPreview(null);
+      setImportName("");
+    } catch {
+      setImportError("Import failed partway — re-run it, imported titles are kept.");
+    } finally {
+      setImportBusy(false);
+      setImportProgress(null);
+    }
+  }
 
   useEffect(() => {
     void checkForUpdate().then(setVersionCheck);
@@ -383,6 +423,63 @@ export default function ProfilePage() {
             </Link>
           </Button>
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-medium flex items-center gap-2">
+          <Download className="h-4 w-4" /> Import from AniList
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          One-time pull of a public AniList list onto this device. No account. Titles you already
+          have get updated; ratings import as whole points.
+        </p>
+        <div className="flex gap-2">
+          <Input
+            value={importName}
+            onChange={(e) => setImportName(e.target.value)}
+            placeholder="AniList username"
+            className="h-10"
+            autoComplete="off"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void previewImport();
+            }}
+          />
+          <Button
+            variant="secondary"
+            className="shrink-0"
+            disabled={importBusy || !importName.trim()}
+            onClick={() => void previewImport()}
+          >
+            {importBusy && !importPreview ? "Fetching…" : "Fetch list"}
+          </Button>
+        </div>
+        {importError && <p className="text-sm text-destructive">{importError}</p>}
+        {importPreview && (
+          <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+            <p className="text-sm font-medium">
+              {importPreview.entries.length} titles · {importPreview.rated} rated
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {(
+                [
+                  ["watching", "Watching"],
+                  ["completed", "Completed"],
+                  ["plan_to_watch", "Plan to watch"],
+                  ["on_hold", "On hold"],
+                  ["dropped", "Dropped"],
+                ] as const
+              )
+                .filter(([key]) => importPreview.byStatus[key] > 0)
+                .map(([key, label]) => `${label} ${importPreview.byStatus[key]}`)
+                .join(" · ")}
+            </p>
+            <Button className="w-full" disabled={importBusy} onClick={() => void applyImport()}>
+              {importProgress
+                ? `Importing ${importProgress.done}/${importProgress.total}…`
+                : "Import into my library"}
+            </Button>
+          </div>
+        )}
       </section>
 
       <section className="space-y-3">
