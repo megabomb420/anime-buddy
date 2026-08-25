@@ -22,6 +22,7 @@ import { isConfirmedOnCrunchyroll } from "@/lib/availability/resolve";
 import { isVagueCatalogQuery } from "@/lib/buddy-intent";
 import { persistence } from "@/lib/db/persistence";
 import { fitsTimeBudget } from "@/lib/time-budget";
+import { allowsUpcomingTitles, isWatchableNow } from "@/lib/recommendation-constraints";
 import { animeTitle } from "@/lib/media";
 import { providers } from "@/lib/providers";
 import {
@@ -185,6 +186,13 @@ export class RecommendationService {
 
     const excluded = new Set(hard.excludeAnilistIds ?? []);
     let candidates = rawCandidates.filter((c) => !excluded.has(c.anilistId));
+
+    // A normal recommendation means something the user can actually start.
+    // AniList discovery pools include announced titles, which previously made
+    // "Short tonight" recommend unreleased movies from a future season.
+    if (!allowsUpcomingTitles(options.query)) {
+      candidates = candidates.filter(isWatchableNow);
+    }
 
     candidates = candidates.filter((c) =>
       passesContentPolicy(c.ageGuide, c.isAdult, {

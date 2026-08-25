@@ -10,6 +10,8 @@ import {
   Moon,
   Heart,
   RefreshCw,
+  Dna,
+  UsersRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -415,6 +417,8 @@ export default function HomePage() {
             { icon: Camera, label: "Scan", to: "/scan" },
             { icon: Compass, label: "Discover", to: "/discover" },
             { icon: MessageCircle, label: "Ask Buddy", to: "/buddy" },
+            { icon: Dna, label: "Taste DNA", to: "/profile#taste" },
+            { icon: UsersRound, label: "Characters", to: "/characters" },
             { icon: Sparkles, label: "Surprise Me", action: loadSurprise },
           ].map((item) => (
             <Button
@@ -553,7 +557,7 @@ export default function HomePage() {
         <section className="grid grid-cols-3 gap-3 text-center">
           {[
             { label: "Library", value: counts.library, to: "/library" },
-            { label: "Taste signals", value: counts.ratings },
+            { label: "Taste signals", value: counts.ratings, to: "/profile#taste" },
             { label: "Favorites", value: counts.favorites, to: "/profile" },
           ].map((s) => (
             <Button

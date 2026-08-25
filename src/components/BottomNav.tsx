@@ -1,4 +1,4 @@
-import { Camera, Compass, Home, Library, MessageCircle } from "lucide-react";
+import { Camera, Compass, Home, Library, MessageCircle, UserRound } from "lucide-react";
 import { NavLink, useLocation } from "react-router";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +8,7 @@ const items = [
   { to: "/scan", label: "Scan", icon: Camera, scan: true },
   { to: "/library", label: "Library", icon: Library },
   { to: "/buddy", label: "Buddy", icon: MessageCircle },
+  { to: "/profile", label: "Profile", icon: UserRound },
 ] as const;
 
 /** Mobile bottom navigation with a center Scan action. */
@@ -28,12 +29,28 @@ export function BottomNav() {
                 key={item.to}
                 to={item.to}
                 aria-label="Scan"
-                className="-mt-5 flex min-h-12 flex-1 flex-col items-center justify-end gap-0.5 pb-1.5 text-[10px]"
+                className={({ isActive }) =>
+                  cn(
+                    "-mt-5 flex min-h-12 flex-1 flex-col items-center justify-end gap-0.5 pb-1.5 text-[10px]",
+                    isActive ? "text-foreground" : "text-muted-foreground",
+                  )
+                }
               >
-                <span className="flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
-                  <Camera className="size-6" strokeWidth={1.8} />
-                </span>
-                Scan
+                {({ isActive }) => (
+                  <>
+                    <span
+                      className={cn(
+                        "flex size-14 items-center justify-center rounded-full border shadow-lg transition-colors",
+                        isActive
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-secondary text-muted-foreground",
+                      )}
+                    >
+                      <Camera className="size-6" strokeWidth={1.8} />
+                    </span>
+                    Scan
+                  </>
+                )}
               </NavLink>
             );
           }

@@ -93,6 +93,18 @@ describe("buildSystemPrompt", () => {
     assert.match(p, /AniList is the catalog/);
   });
 
+  it("makes recommendation turns choose named AniList titles before cards appear", () => {
+    const p = buildSystemPrompt({
+      recommendationTurn: true,
+      catalogPicks: [
+        { title: "Ghost in the Shell", genres: ["Action", "Sci-Fi"], anilistId: 43 },
+      ],
+    });
+    assert.match(p, /Choose 1–3 titles now/);
+    assert.match(p, /exactly as written/);
+    assert.match(p, /only to titles you actually name/);
+  });
+
   it("wires spoiler limits into the prompt", () => {
     const p = buildSystemPrompt({
       spoilerLevel: "strict",

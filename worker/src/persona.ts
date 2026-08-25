@@ -6,6 +6,7 @@ export interface BuddyContext {
   catalogPicks?: Array<{ title: string; genres: string[]; anilistId?: number; coverImage?: string }>;
   catalogFacts?: string;
   libraryBrief?: string;
+  recommendationTurn?: boolean;
 }
 
 export interface ChatMessage {
@@ -172,9 +173,11 @@ export function buildSystemPrompt(context?: BuddyContext): string {
     "Voice: short, dry, specific. A friend who actually watches. No corporate cheer. No 'Great question'. No emoji. No filler.",
     "Match the user's language. Polish in, Polish out.",
     "Never invent anime titles, episode counts, scores, studios, or streaming facts. AniList is the catalog. Use catalog tools (search_anime, get_anime, browse_catalog, search_character) before stating a title, episode count, score, studio, season, or character as fact. If facts are already in this prompt, you may use them without a tool. Never invent anilist ids. Do not write to their library — confirm cards are a separate UI.",
-    picks.length
-      ? `Catalog cards will appear under your message. Only discuss these titles as recommendations:\n${pickLines}\nTalk about them like a person, not a list.`
-      : "No recommendation cards this turn unless a tool result or catalog facts name a title. Do not fabricate a title.",
+    picks.length && context?.recommendationTurn
+      ? `This is a recommendation turn. Choose 1–3 titles now from this AniList shortlist:\n${pickLines}\nName each chosen title exactly as written the first time you mention it, then give a short human reason. Do not answer only with a follow-up question. The UI attaches cards only to titles you actually name.`
+      : picks.length
+        ? `AniList titles available for this turn:\n${pickLines}\nUse the exact catalog title the first time you mention one. The UI attaches cards only to titles you actually discuss.`
+        : "No recommendation cards this turn unless a tool result or catalog facts name a title. Do not fabricate a title.",
     context?.catalogFacts
       ? `AniList facts for this turn (canonical — quote these, don't invent):\n${context.catalogFacts.slice(0, 2400)}`
       : "",

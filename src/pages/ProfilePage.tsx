@@ -287,6 +287,26 @@ export default function ProfilePage() {
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold">Profile</h1>
 
+      <nav aria-label="Profile tools" className="grid grid-cols-2 gap-2">
+        {[
+          { href: "#taste", label: "Taste DNA", icon: Star },
+          { href: "#preferences", label: "Preferences", icon: Settings },
+          { href: "#anilist-import", label: "AniList import", icon: Download },
+          { href: "#hidden", label: "Hidden titles", icon: EyeOff },
+          { href: "#characters", label: "Characters", icon: User },
+          { href: "#data", label: "Backup data", icon: Upload },
+        ].map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            className="flex min-h-12 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium pressable"
+          >
+            <item.icon className="size-4 text-muted-foreground" />
+            {item.label}
+          </a>
+        ))}
+      </nav>
+
       <VisionGatewayCard />
 
       {stats && (
@@ -323,7 +343,7 @@ export default function ProfilePage() {
         </section>
       )}
 
-      <section className="space-y-3">
+      <section id="taste" className="scroll-mt-24 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-medium flex items-center gap-2">
             <Star className="h-4 w-4" /> Taste DNA
@@ -422,7 +442,7 @@ export default function ProfilePage() {
         </section>
       )}
 
-      <section className="space-y-3">
+      <section id="preferences" className="scroll-mt-24 space-y-3">
         <h2 className="font-medium flex items-center gap-2">
           <Settings className="h-4 w-4" /> Content visibility
         </h2>
@@ -485,7 +505,7 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section id="hidden" className="scroll-mt-24 space-y-3">
         <h2 className="font-medium flex items-center gap-2">
           <EyeOff className="h-4 w-4" /> Hidden titles
         </h2>
@@ -510,7 +530,7 @@ export default function ProfilePage() {
         )}
       </section>
 
-      <section className="space-y-3">
+      <section id="characters" className="scroll-mt-24 space-y-3">
         <h2 className="font-medium">Quick Links</h2>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm">
@@ -526,7 +546,7 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      <section className="space-y-3">
+      <section id="anilist-import" className="scroll-mt-24 space-y-3">
         <h2 className="font-medium flex items-center gap-2">
           <Download className="h-4 w-4" /> Import from AniList
         </h2>
@@ -583,7 +603,7 @@ export default function ProfilePage() {
         )}
       </section>
 
-      <section className="space-y-3">
+      <section id="data" className="scroll-mt-24 space-y-3">
         <h2 className="font-medium flex items-center gap-2">
           <Download className="h-4 w-4" /> Your data
         </h2>

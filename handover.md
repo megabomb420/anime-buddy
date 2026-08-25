@@ -1,8 +1,8 @@
 # Anime Buddy — Handover (for the next agent)
 
 **Date:** 2026-08-25  
-**App version:** `0.3.33` (live)  
-**HEAD:** `main` @ 0.3.20 (see `git log -1`)  
+**App version:** `0.3.34`<br>
+**HEAD:** `main` @ v0.3.34 (use `git log -1` for the commit SHA)<br>
 **Live PWA:** https://megabomb420.github.io/anime-buddy/  
 **Source:** https://github.com/megabomb420/anime-buddy  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev  
@@ -38,7 +38,7 @@ Order in `src/pages/BuddyPage.tsx` `send()`:
 1. **WRITE** — library / rate / progress (incl. comma / `and` / `i` lists) → AniList search → Confirm cards → IndexedDB. **No DeepSeek.**
 2. **LIBRARY READ** — `what am I watching` / `co oglądam` / `my library` → IndexedDB cards. **No DeepSeek.**
 3. **LOOKUP** — `znajdź` / `find` / bare title → catalog cards. **No DeepSeek.** Compare runs here too, checked **before** bare-title: `compare X and Y` / `porównaj X z Y` / bare `X vs Y` → both sides resolved via `resolveTitleMatch` → side-by-side `CompareCard` (AniList facts only).
-4. **CHAT** — rec / facts / free talk → PWA prefetches AniList (`buddy-catalog.ts`) + optional `RecommendationService` → stream DeepSeek with `catalogFacts` / `libraryBrief` / `tasteSummary` / `spoilerLimits`. Long chats go through `buddy-session.ts` first: turns older than the last 11 collapse into one `[Earlier in this chat — recap]` message (deterministic — only echoes parsed user intents), so the Worker never sees more than 12 messages.
+4. **CHAT** — rec / facts / free talk → PWA prefetches AniList (`buddy-catalog.ts`) + optional `RecommendationService` → stream DeepSeek with `catalogFacts` / `libraryBrief` / `tasteSummary` / `spoilerLimits`. Recommendation candidates are context only: `buddy-card-selection.ts` attaches cards **after** the final reply and only for AniList titles Ren explicitly names. Long chats go through `buddy-session.ts` first: turns older than the last 11 collapse into one `[Earlier in this chat — recap]` message (deterministic — only echoes parsed user intents), so the Worker never sees more than 12 messages.
 
 Persona lock: client (`src/lib/buddy/persona.ts`) **and** Worker (`worker/src/persona.ts`). Keep them in sync. Spam guard is client-side. User must confirm all library/rating writes.
 
@@ -46,17 +46,17 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 
 ---
 
-## Live status (verified 2026-08-24)
+## Live status (verified 2026-08-25)
 
 | Surface | State |
 | --- | --- |
-| Pages | **v0.3.33** — `version.json` must match `package.json` |
+| Pages | **v0.3.34** after the Pages workflow completes — `version.json` must match `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
-| Worker tools | Live (CLI deploy). Persona includes spoiler lock. |
-| Worker GitHub Action | **Green since 2026-08-24** (run attempt 3, commit `9de5d10`). Secrets live in Settings → Secrets → **Actions**; account ID `d357be58f5550eea081b0c8d80824abf` (Whip Blanket). Token = Cloudflare **Edit Cloudflare Workers** template |
-| Owner CLI | `wrangler` logged in as `przemek.fall@gmail.com` / account Whip Blanket. CLI deploy still works as fallback; CI is primary |
+| Worker tools | Live. Persona includes spoiler lock and Ren/card alignment. |
+| Worker GitHub Action | Configured and green since 2026-08-24. It runs on `worker/**` changes or manually. Secrets live in Settings → Secrets → **Actions**. Token scope: Cloudflare **Edit Cloudflare Workers** template |
+| Owner CLI | `wrangler` owner login works as a fallback; CI is primary. Do not put account emails or IDs in this public file. |
 
-If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.33**.
+If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.34**.
 
 ```bash
 curl -s https://megabomb420.github.io/anime-buddy/version.json
@@ -76,6 +76,8 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.13 | Home **For you** row — ratings + library → AniList pool, ranked in `src/lib/taste-rank.ts` |
 | 0.3.14 | **For you** polish — reason under each poster, Refresh cycles next-best titles, Interested / Not for me tap feedback via `recordFeedback` (`forYou()` returns `reasons`, takes `excludeIds`) |
 | 0.3.15 | **Tonight** no longer Crunchyroll-first (`requireCrunchyroll: false`, same as Ren recs) → picks always render |
+| 0.3.16 | **Session recap** — `src/lib/buddy-session.ts`: chats longer than 12 messages send a deterministic `[Earlier in this chat — recap]` (logged / rated / looked-up / rec asks) + last 11 verbatim to the Worker. Token save without Ren forgetting; no Worker change |
+| 0.3.17 | **Compare two titles** — `parseCompareQuery` in `catalog-search.ts` + `src/components/anime/CompareCard.tsx`: `compare X and Y` / `porównaj X z Y` / `X vs Y` → side-by-side AniList facts (score, episodes, status, format, season, genres, studio). No DeepSeek |
 | 0.3.18 | Featured hero: **swipe left/right** on touch (48px threshold, vertical scroll untouched), rotation now **10s**, manual pick (dots or swipe) restarts the timer |
 | 0.3.19 | Hero dedupe: **Open title** → detail, **Details** replaced by **Ask Ren** → `/buddy` with `location.state.prefill` (BuddyPage consumes it once). Cover **slow zoom-in** synced to the 10s window (`hero-kenburns` now `10s ease-out forwards`) |
 | 0.3.20 | Same slow zoom on the **anime detail banner** (`.detail-banner-art`, one-shot 14s, reduced-motion respected) |
@@ -92,10 +94,9 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.31 | **Code-splitting** — recharts moved to `src/components/profile/ProfileCharts.tsx` behind `React.lazy` + `Suspense` (skeleton fallback); all routes except Home/Discover lazy in `App.tsx`. Entry chunk 1140 → 508 kB (gzip 337 → 163 kB); charts (396 kB) load only on Profile |
 | 0.3.32 | **This week rail on Home** — next episodes of watching **and** plan-to-watch titles airing within 7 days (`AIRING_WEEK_MS`), sorted by air time, max 12 posters. New `airingWeekdayLabel` in `airing.ts` ("out now" / "today" / "tomorrow" / "Fri", unit-tested). Airing query now covers the whole watching+PTW list, not just Continue Watching |
 | 0.3.33 | **Shareable Taste DNA card** — Profile → Taste DNA → **Share** renders a 1080×1350 PNG on a canvas (summary blurb + top-5 genre bars + completed/avg/hours stats + footer URL), then `navigator.share` with files or PNG download fallback. `src/lib/taste-card.ts` (canvas) + `src/lib/taste-card-text.ts` (pure `wrapWords`/`clampLines`, unit-tested). AbortError from a cancelled share sheet is swallowed quietly |
-| 0.3.16 | **Session recap** — `src/lib/buddy-session.ts`: chats longer than 12 messages send a deterministic `[Earlier in this chat — recap]` (logged / rated / looked-up / rec asks) + last 11 verbatim to the Worker. Token save without Ren forgetting; no Worker change |
-| 0.3.17 | **Compare two titles** — `parseCompareQuery` in `catalog-search.ts` + `src/components/anime/CompareCard.tsx`: `compare X and Y` / `porównaj X z Y` / `X vs Y` → side-by-side AniList facts (score, episodes, status, format, season, genres, studio). No DeepSeek |
+| 0.3.34 | **Ren/card alignment + feature discoverability** — recommendation candidates no longer render automatically. `buddy-card-selection.ts` attaches only titles Ren explicitly names; recommendation turns require an immediate 1–3 title answer using exact AniList names; card-side AI reasons were removed; normal watch-now recs exclude `NOT_YET_RELEASED`/`CANCELLED`. Profile is now in bottom nav, inactive Scan no longer looks selected, Home exposes Taste DNA + Characters, Profile has section shortcuts, and active chats keep quick actions visible. |
 
-Worker tools + SSE health went live via CLI (not CI).
+Worker CI is primary; owner CLI deploy remains the fallback.
 
 ---
 
@@ -109,6 +110,8 @@ Worker tools + SSE health went live via CLI (not CI).
 | `src/lib/catalog-search.ts` | Title normalize (`×`→` x `), lookup, rank |
 | `src/lib/buddy-catalog.ts` + `buddy-catalog-ask.ts` | Prefetch AniList facts for CHAT |
 | `src/lib/buddy-session.ts` | Recap of older chat turns → Worker never sees > 12 messages (unit-tested) |
+| `src/lib/buddy-card-selection.ts` | Final-reply gate: show cards only for titles Ren names (unit-tested) |
+| `src/lib/recommendation-constraints.ts` | Excludes unreleased/cancelled titles from normal watch-now recs (unit-tested) |
 | `src/lib/buddy/persona.ts` | Client lock + system prompt |
 | `src/lib/undo.ts` | 6s Undo toast helper — every library/rating/progress write |
 | `src/lib/time-budget.ts` | Tonight runtime math (episodes × 24 min, movie ≈ 100 min) — unit-tested |
@@ -123,7 +126,7 @@ Worker tools + SSE health went live via CLI (not CI).
 Tests (no npm test script):
 
 ```bash
-node --experimental-strip-types --test src/lib/buddy-library.test.ts src/lib/buddy/persona.test.ts src/lib/buddy-catalog.test.ts src/lib/buddy-intent.test.ts src/lib/taste-rank.test.ts src/lib/catalog-search.test.ts src/lib/buddy-session.test.ts src/lib/time-budget.test.ts src/lib/airing.test.ts src/lib/anilist-import.test.ts src/lib/buddy-type.test.ts src/lib/taste-card-text.test.ts
+node --experimental-strip-types --test src/lib/buddy-library.test.ts src/lib/buddy/persona.test.ts src/lib/buddy-catalog.test.ts src/lib/buddy-intent.test.ts src/lib/taste-rank.test.ts src/lib/catalog-search.test.ts src/lib/buddy-session.test.ts src/lib/time-budget.test.ts src/lib/airing.test.ts src/lib/anilist-import.test.ts src/lib/buddy-type.test.ts src/lib/taste-card-text.test.ts src/lib/buddy-card-selection.test.ts src/lib/recommendation-constraints.test.ts
 node node_modules/typescript/bin/tsc -b --pretty false
 ```
 
@@ -135,7 +138,7 @@ Do **not** run `npx tsc` — that can grab the dummy npm `tsc` package.
 
 **Pages:** push `main` → `.github/workflows/pages.yml`. Bump `package.json` version when shipping user-facing app changes.
 
-**Worker:** separate. Pages does **not** update it.
+**Worker:** separate. Pages does **not** update it. Pushes touching `worker/**` trigger `.github/workflows/deploy-worker.yml`; CLI is the fallback.
 
 ```bash
 cd worker
@@ -144,7 +147,7 @@ npx wrangler deploy
 
 After Worker deploy, health must keep `chat:"sse"`, `thinking:true`, `tools:true`.
 
-If you lack Cloudflare credentials: say so. Do not pretend it deployed. CI Worker job will keep failing until repo secrets exist.
+If CI fails, inspect the Action and verify `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`. If you lack Cloudflare credentials: say so. Do not pretend it deployed.
 
 ---
 
@@ -156,6 +159,7 @@ If you lack Cloudflare credentials: say so. Do not pretend it deployed. CI Worke
 4. **For you** is empty until the user rates or logs library titles. By design.
 5. **Client vs Worker persona.** Spoiler block exists in both. Change both or chat/Worker drift.
 6. **Do not put keys in** `VITE_*`, `.env`, or `wrangler.toml` `[vars]`.
+7. **Recommendation candidates are not UI.** Do not bypass `picksMentionedInReply`; cards must follow Ren's final words, never pre-empt them.
 
 ---
 

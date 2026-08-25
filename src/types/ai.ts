@@ -35,6 +35,8 @@ export interface BuddyContext {
   catalogFacts?: string;
   /** Short "Title (status)" list from the local library. */
   libraryBrief?: string;
+  /** This turn asks Ren to choose and name a recommendation now. */
+  recommendationTurn?: boolean;
 }
 
 export interface HardConstraints {

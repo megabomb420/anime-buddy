@@ -36,6 +36,7 @@ import {
 import { parseBareTitleQuery, parseCompareQuery, parseLookupQuery, resolveTitleMatch } from "@/lib/catalog-search";
 import { factsFromPicks, resolveBuddyCatalog } from "@/lib/buddy-catalog";
 import { buildSessionHistory } from "@/lib/buddy-session";
+import { picksMentionedInReply } from "@/lib/buddy-card-selection";
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
 import { undoToast } from "@/lib/undo";
 import { animeTitle } from "@/lib/media";
@@ -97,6 +98,15 @@ const LOG_PREFIXES = [
 ];
 
 const LIBRARY_CHIPS = [{ label: "What am I watching?", query: "what am I watching" }];
+
+const CONVERSATION_CHIPS = [
+  { label: "Pick for me", query: "Surprise me" },
+  { label: "My list", query: "what am I watching" },
+  { label: "Find", prefix: "find " },
+  { label: "Compare", prefix: "compare " },
+  { label: "Log", prefix: "I'm watching " },
+  { label: "Rate", prefix: "rate " },
+] as const;
 
 const ACTION_LABELS: Record<string, string> = {
   favorite: "Confirm · ★ Favorite",
@@ -168,7 +178,9 @@ async function catalogPicksFor(text: string): Promise<{ picks: RecPick[]; factsT
     const anime = await animeCatalogService.getAnime(item.anilistId);
     if (anime) {
       animes.push(anime);
-      picks.push(recPickFromAnime(anime, item.reason));
+      // Ren's reply is the recommendation reason. Keeping the reranker's
+      // separate prose on the card allowed it to contradict AniList metadata.
+      picks.push(recPickFromAnime(anime));
     }
   }
   return { picks, factsText: factsFromPicks(animes).factsText };
@@ -753,6 +765,7 @@ export default function BuddyPage() {
           tasteSummary: taste?.summary,
           spoilerLevel: settings?.spoilerLevel ?? "normal",
           spoilerLimits: spoilerLimits.length ? spoilerLimits : undefined,
+          recommendationTurn: recAsk,
         },
         onDelta,
         (extra) => {
@@ -760,7 +773,12 @@ export default function BuddyPage() {
         },
       );
 
-      const shownPicks = mergePicks(picks, workerPicks);
+      // Candidates are context, not output. A card becomes visible only after
+      // Ren explicitly names that AniList title in the final reply.
+      const shownPicks = picksMentionedInReply(
+        reply,
+        mergePicks(workerPicks, picks),
+      );
 
       await persistAssistantReply(convo.id, reply, {
         polish,
@@ -827,6 +845,28 @@ export default function BuddyPage() {
             Connect
           </Link>
         </p>
+      )}
+
+      {messages.length > 0 && (
+        <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-border/70 px-4 py-2 scrollbar-none">
+          {CONVERSATION_CHIPS.map((chip) => (
+            <Button
+              key={chip.label}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 shrink-0 rounded-full px-3 text-xs"
+              disabled={sending}
+              onClick={() =>
+                "query" in chip && chip.query
+                  ? void send(chip.query)
+                  : applyPrefix("prefix" in chip ? chip.prefix : "")
+              }
+            >
+              {chip.label}
+            </Button>
+          ))}
+        </div>
       )}
 
       <div ref={scrollerRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
@@ -970,6 +1010,11 @@ export default function BuddyPage() {
                 )}
                 {m.picks && m.picks.length > 0 && (
                   <div className="max-w-[85%] space-y-2">
+                    {m.role === "assistant" && (
+                      <p className="px-1 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                        AniList · mentioned by Ren
+                      </p>
+                    )}
                     {m.picks.map((pick) => (
                       <RecPickCard key={pick.anilistId} pick={pick} />
                     ))}
