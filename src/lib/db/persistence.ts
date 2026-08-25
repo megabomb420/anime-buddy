@@ -202,6 +202,37 @@ export const persistence = {
     return db.animeRatings.toArray();
   },
 
+  async getLibraryEntry(anilistId: number): Promise<LibraryEntry | undefined> {
+    return db.libraryEntries.get(anilistId);
+  },
+
+  /** Undo support: put back a previously captured entry verbatim. */
+  async restoreLibraryEntry(entry: LibraryEntry): Promise<void> {
+    await db.libraryEntries.put(entry);
+  },
+
+  async getProgress(anilistId: number): Promise<number | undefined> {
+    return (await db.viewingProgress.get(anilistId))?.episode;
+  },
+
+  /** Undo support: restore (or clear) a previously captured episode count. */
+  async restoreProgress(anilistId: number, episode: number | undefined): Promise<void> {
+    if (episode === undefined) {
+      await db.viewingProgress.delete(anilistId);
+    } else {
+      await db.viewingProgress.put({ anilistId, episode, updatedAt: now() });
+    }
+  },
+
+  async removeAnimeRating(anilistId: number): Promise<void> {
+    await db.animeRatings.delete(anilistId);
+  },
+
+  /** Undo support: put back a previously captured rating verbatim. */
+  async restoreAnimeRating(rating: AnimeRating): Promise<void> {
+    await db.animeRatings.put(rating);
+  },
+
   async getFavoriteAnime(): Promise<FavoriteAnime[]> {
     return db.favoriteAnime.toArray();
   },

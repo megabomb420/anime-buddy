@@ -10,6 +10,7 @@ import {
   type ScanOutcome,
 } from "@/lib/services/VisionService";
 import { persistence } from "@/lib/db/persistence";
+import { undoToast } from "@/lib/undo";
 import { blobToObjectUrl } from "@/lib/image/compress";
 import { getWorkerUrl } from "@/lib/worker-gateway";
 import { cn } from "@/lib/utils";
@@ -202,7 +203,12 @@ export default function ScanPage() {
   }
 
   async function addToLibrary(id: number) {
+    const prev = await persistence.getLibraryEntry(id);
     await persistence.setLibraryStatus(id, "plan_to_watch");
+    undoToast("Added to Want to Watch", async () => {
+      if (prev) await persistence.restoreLibraryEntry(prev);
+      else await persistence.removeLibraryEntry(id);
+    });
   }
 
   const showViewfinder = phase === "live" || phase === "requesting";

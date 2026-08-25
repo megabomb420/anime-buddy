@@ -79,6 +79,7 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.18 | Featured hero: **swipe left/right** on touch (48px threshold, vertical scroll untouched), rotation now **10s**, manual pick (dots or swipe) restarts the timer |
 | 0.3.19 | Hero dedupe: **Open title** → detail, **Details** replaced by **Ask Ren** → `/buddy` with `location.state.prefill` (BuddyPage consumes it once). Cover **slow zoom-in** synced to the 10s window (`hero-kenburns` now `10s ease-out forwards`) |
 | 0.3.20 | Same slow zoom on the **anime detail banner** (`.detail-banner-art`, one-shot 14s, reduced-motion respected) |
+| 0.3.21 | **Undo toasts** on every library/rating write (Buddy confirms, detail status/rating/remove, Scan "Plan to watch") — 6s sonner toast restores the exact previous entry/rating/progress via new `persistence` restore helpers |
 | 0.3.16 | **Session recap** — `src/lib/buddy-session.ts`: chats longer than 12 messages send a deterministic `[Earlier in this chat — recap]` (logged / rated / looked-up / rec asks) + last 11 verbatim to the Worker. Token save without Ren forgetting; no Worker change |
 | 0.3.17 | **Compare two titles** — `parseCompareQuery` in `catalog-search.ts` + `src/components/anime/CompareCard.tsx`: `compare X and Y` / `porównaj X z Y` / `X vs Y` → side-by-side AniList facts (score, episodes, status, format, season, genres, studio). No DeepSeek |
 

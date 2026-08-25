@@ -32,6 +32,7 @@ import { parseBareTitleQuery, parseCompareQuery, parseLookupQuery, resolveTitleM
 import { factsFromPicks, resolveBuddyCatalog } from "@/lib/buddy-catalog";
 import { buildSessionHistory } from "@/lib/buddy-session";
 import { checkConfirmSpam, checkMessageSpam, spamReply } from "@/lib/buddy-spam";
+import { undoToast } from "@/lib/undo";
 import { animeTitle } from "@/lib/media";
 import { looksPolish } from "@/lib/buddy/persona";
 import { typeOut } from "@/lib/buddy-type";
@@ -264,7 +265,14 @@ export default function BuddyPage() {
       return;
     }
 
+    const prevEntry = await persistence.getLibraryEntry(pick.anilistId);
+    const prevProgress = await persistence.getProgress(pick.anilistId);
     await persistence.setLibraryStatus(pick.anilistId, status, progress ?? 0);
+    undoToast(`Saved “${animeTitle(pick)}” · ${libraryStatusLabel(status, false)}`, async () => {
+      if (prevEntry) await persistence.restoreLibraryEntry(prevEntry);
+      else await persistence.removeLibraryEntry(pick.anilistId);
+      await persistence.restoreProgress(pick.anilistId, prevProgress);
+    });
     if (reason && status === "dropped") {
       try {
         await persistence.addTasteSignal({
@@ -294,7 +302,12 @@ export default function BuddyPage() {
       return;
     }
 
+    const prevRating = await persistence.getAnimeRating(pick.anilistId);
     await persistence.setAnimeRating(pick.anilistId, score);
+    undoToast(`Rated “${animeTitle(pick)}” ${score}/10`, async () => {
+      if (prevRating) await persistence.restoreAnimeRating(prevRating);
+      else await persistence.removeAnimeRating(pick.anilistId);
+    });
     try {
       await tasteService.learnFromRating(pick.anilistId, score);
     } catch {

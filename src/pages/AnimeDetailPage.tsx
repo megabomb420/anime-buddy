@@ -22,6 +22,7 @@ import { db } from "@/lib/db/database";
 import { providers } from "@/lib/providers";
 import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
 import { persistence } from "@/lib/db/persistence";
+import { undoToast } from "@/lib/undo";
 import { tasteService } from "@/lib/services/TasteService";
 import type { AnimeSummary, CharacterSummary } from "@/types/anime";
 import type { LibraryEntry, LibraryStatus, UserNote } from "@/types/entities";
@@ -141,13 +142,30 @@ export default function AnimeDetailPage() {
   }, [anime?.anilistId]);
 
   async function setStatus(status: LibraryStatus) {
+    const prevEntry = await persistence.getLibraryEntry(id);
+    const prevProgress = await persistence.getProgress(id);
     const entry = await persistence.setLibraryStatus(id, status, progress);
     setLibraryEntry(entry);
+    undoToast(`Marked as ${STATUS_LABELS[status]}`, async () => {
+      if (prevEntry) await persistence.restoreLibraryEntry(prevEntry);
+      else await persistence.removeLibraryEntry(id);
+      await persistence.restoreProgress(id, prevProgress);
+      setLibraryEntry(prevEntry);
+    });
   }
 
   async function removeFromLibrary() {
+    const prevEntry = await persistence.getLibraryEntry(id);
+    const prevProgress = await persistence.getProgress(id);
     await persistence.removeLibraryEntry(id);
     setLibraryEntry(undefined);
+    if (prevEntry) {
+      undoToast(`Removed “${displayTitle}” from Library`, async () => {
+        await persistence.restoreLibraryEntry(prevEntry);
+        await persistence.restoreProgress(id, prevProgress);
+        setLibraryEntry(prevEntry);
+      });
+    }
   }
 
   async function toggleFavorite() {
@@ -161,8 +179,14 @@ export default function AnimeDetailPage() {
   }
 
   async function saveRating(score: number) {
+    const prevRating = await persistence.getAnimeRating(id);
     await persistence.setAnimeRating(id, score);
     setRating(score);
+    undoToast(`Rated “${displayTitle}” ${score}/10`, async () => {
+      if (prevRating) await persistence.restoreAnimeRating(prevRating);
+      else await persistence.removeAnimeRating(id);
+      setRating(prevRating?.score);
+    });
     await tasteService.learnFromRating(id, score);
     await tasteService.rebuildTasteProfile(false);
   }

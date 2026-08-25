@@ -1,5 +1,6 @@
 import { Route, Routes, useLocation } from "react-router";
 import { BottomNav } from "@/components/BottomNav";
+import { Toaster } from "@/components/ui/sonner";
 import BuddyPage from "@/pages/BuddyPage";
 import DiscoverPage from "@/pages/DiscoverPage";
 import HomePage from "@/pages/HomePage";
@@ -24,6 +25,7 @@ export default function App() {
         </Routes>
       ) : (
         <>
+          <Toaster position="top-center" />
           <main
             className={
               buddy
