@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Scatter,
+  ScatterChart,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
   BarChart3,
   Download,
   EyeOff,
@@ -56,6 +67,7 @@ export default function ProfilePage() {
   const [genreDistribution, setGenreDistribution] = useState<Record<string, number>>({});
   const [ratingDistribution, setRatingDistribution] = useState<Record<number, number>>({});
   const [hiddenList, setHiddenList] = useState<Array<{ anilistId: number; title: string }>>([]);
+  const [scoreCompare, setScoreCompare] = useState<Array<{ title: string; yours: number; anilist: number }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [versionCheck, setVersionCheck] = useState<VersionCheck | null>(null);
   const [rebuildingTaste, setRebuildingTaste] = useState(false);
@@ -165,6 +177,19 @@ export default function ProfilePage() {
         });
       }
       setHiddenList(resolved);
+
+      const compare: Array<{ title: string; yours: number; anilist: number }> = [];
+      for (const r of ratings) {
+        const cached = await persistence.getCachedAnime(r.anilistId);
+        if (cached?.anilistScore) {
+          compare.push({
+            title: cached.title.english ?? cached.title.romaji,
+            yours: r.score,
+            anilist: Math.round(cached.anilistScore) / 10,
+          });
+        }
+      }
+      setScoreCompare(compare);
     })();
   }, []);
 
@@ -216,6 +241,17 @@ export default function ProfilePage() {
   }
 
   if (!settings) return null;
+
+  const genreChart = Object.entries(genreDistribution)
+    .filter(([, w]) => w > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([genre, weight]) => ({ genre, weight: Math.round(weight * 10) / 10 }));
+
+  const avgDelta =
+    scoreCompare.length > 0
+      ? scoreCompare.reduce((s, c) => s + (c.yours - c.anilist), 0) / scoreCompare.length
+      : 0;
 
   return (
     <div className="space-y-8">
@@ -283,6 +319,33 @@ export default function ProfilePage() {
             </p>
           )}
         </div>
+        {genreChart.length >= 3 && (
+          <div className="h-48 rounded-xl border border-border bg-card p-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={genreChart} layout="vertical" margin={{ left: 4, right: 12, top: 4, bottom: 4 }}>
+                <XAxis type="number" hide />
+                <YAxis
+                  type="category"
+                  dataKey="genre"
+                  width={92}
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <RechartsTooltip
+                  cursor={{ fill: "hsl(var(--accent))" }}
+                  contentStyle={{
+                    background: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                />
+                <Bar dataKey="weight" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
         {Object.keys(genreDistribution).length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(genreDistribution)
@@ -317,6 +380,54 @@ export default function ProfilePage() {
                 </div>
               );
             })}
+          </div>
+        </section>
+      )}
+
+      {scoreCompare.length >= 3 && (
+        <section className="space-y-3">
+          <h2 className="font-medium flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" /> You vs the crowd
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {avgDelta >= 0 ? "You rate" : "You rate"} {Math.abs(avgDelta).toFixed(1)}{" "}
+            {avgDelta >= 0 ? "higher" : "lower"} than the AniList crowd on average (
+            {scoreCompare.length} rated). X = AniList score, Y = yours.
+          </p>
+          <div className="h-56 rounded-xl border border-border bg-card p-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <ScatterChart margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+                <XAxis
+                  type="number"
+                  dataKey="anilist"
+                  domain={[0, 10]}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickLine={false}
+                />
+                <YAxis
+                  type="number"
+                  dataKey="yours"
+                  domain={[0, 10]}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickLine={false}
+                />
+                <RechartsTooltip
+                  cursor={{ strokeDasharray: "3 3" }}
+                  contentStyle={{
+                    background: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                  formatter={(value, name) => [value, name === "anilist" ? "AniList" : "You"]}
+                  labelFormatter={(_, payload) =>
+                    (payload?.[0]?.payload as { title?: string } | undefined)?.title ?? ""
+                  }
+                />
+                <Scatter data={scoreCompare} fill="hsl(var(--primary))" />
+              </ScatterChart>
+            </ResponsiveContainer>
           </div>
         </section>
       )}
