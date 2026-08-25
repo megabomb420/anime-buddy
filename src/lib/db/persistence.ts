@@ -22,6 +22,7 @@ import type {
   Message,
   RecommendationFeedback,
   RecommendationRecord,
+  ScanRecord,
   SemanticMemory,
   Settings,
   TasteProfile,
@@ -412,6 +413,22 @@ export const persistence = {
 
   async getHiddenAnime(): Promise<HiddenAnime[]> {
     return db.hiddenAnime.toArray();
+  },
+
+  // ----- scan history -----
+
+  async addScanRecord(input: Omit<ScanRecord, "id" | "createdAt">): Promise<ScanRecord> {
+    const record: ScanRecord = { ...input, id: newId(), createdAt: now() };
+    await db.scanRecords.put(record);
+    return record;
+  },
+
+  async getScanRecords(limit = 12): Promise<ScanRecord[]> {
+    return db.scanRecords.orderBy("createdAt").reverse().limit(limit).toArray();
+  },
+
+  async deleteScanRecord(id: string): Promise<void> {
+    await db.scanRecords.delete(id);
   },
 
   // ----- export/import (whole personal dataset) -----

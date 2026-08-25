@@ -1,7 +1,7 @@
 # Anime Buddy — Handover (for the next agent)
 
-**Date:** 2026-08-24  
-**App version:** `0.3.20` (live)  
+**Date:** 2026-08-25  
+**App version:** `0.3.28` (live)  
 **HEAD:** `main` @ 0.3.20 (see `git log -1`)  
 **Live PWA:** https://megabomb420.github.io/anime-buddy/  
 **Source:** https://github.com/megabomb420/anime-buddy  
@@ -50,13 +50,13 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 
 | Surface | State |
 | --- | --- |
-| Pages | **v0.3.20** — `version.json` must match `package.json` |
+| Pages | **v0.3.28** — `version.json` must match `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live (CLI deploy). Persona includes spoiler lock. |
 | Worker GitHub Action | **Green since 2026-08-24** (run attempt 3, commit `9de5d10`). Secrets live in Settings → Secrets → **Actions**; account ID `d357be58f5550eea081b0c8d80824abf` (Whip Blanket). Token = Cloudflare **Edit Cloudflare Workers** template |
 | Owner CLI | `wrangler` logged in as `przemek.fall@gmail.com` / account Whip Blanket. CLI deploy still works as fallback; CI is primary |
 
-If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.20**.
+If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.28**.
 
 ```bash
 curl -s https://megabomb420.github.io/anime-buddy/version.json
@@ -86,6 +86,7 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.25 | **Tonight hard time budget** — `src/lib/time-budget.ts` (unit-tested): MOVIE ≈ 100 min, series = episodes × 24 min, unknown episode counts never fit. Wired into Home Tonight chips **and** Ren's time-budget asks (`I have 40 minutes`). Fallback note when nothing fits |
 | 0.3.26 | **Next-episode countdown** — batched AniList `nextAiringEpisode` query (`AniListProvider.getAiringSchedule`, always fresh, not cached) → "Next: Ep N · in 2d" chips in Home **Continue Watching** and Library watching rows. `src/lib/airing.ts` label helper (unit-tested) |
 | 0.3.27 | **Library upgrade** — in-list filter, sort (Recent / Title / My rating / Progress), poster-grid view toggle; prefs persist in `localStorage` (`anime-buddy:library-prefs`) |
+| 0.3.28 | **Scan history** — DB schema v3 `scanRecords` (photo blob + matched title/character stored locally). Intro screen shows **Recent scans** (tap → anime detail, X deletes). Match cards gain **Ask Ren** → Buddy prefill |
 | 0.3.16 | **Session recap** — `src/lib/buddy-session.ts`: chats longer than 12 messages send a deterministic `[Earlier in this chat — recap]` (logged / rated / looked-up / rec asks) + last 11 verbatim to the Worker. Token save without Ren forgetting; no Worker change |
 | 0.3.17 | **Compare two titles** — `parseCompareQuery` in `catalog-search.ts` + `src/components/anime/CompareCard.tsx`: `compare X and Y` / `porównaj X z Y` / `X vs Y` → side-by-side AniList facts (score, episodes, status, format, season, genres, studio). No DeepSeek |
 
@@ -104,6 +105,9 @@ Worker tools + SSE health went live via CLI (not CI).
 | `src/lib/buddy-catalog.ts` + `buddy-catalog-ask.ts` | Prefetch AniList facts for CHAT |
 | `src/lib/buddy-session.ts` | Recap of older chat turns → Worker never sees > 12 messages (unit-tested) |
 | `src/lib/buddy/persona.ts` | Client lock + system prompt |
+| `src/lib/undo.ts` | 6s Undo toast helper — every library/rating/progress write |
+| `src/lib/time-budget.ts` | Tonight runtime math (episodes × 24 min, movie ≈ 100 min) — unit-tested |
+| `src/lib/airing.ts` | Next-episode countdown labels — unit-tested |
 | `src/lib/taste-rank.ts` | Deterministic For-you scoring (unit-tested) |
 | `src/lib/services/RecommendationService.ts` | Rec pipeline + `forYou()` |
 | `src/lib/db/persistence.ts` | **Only** IndexedDB door. It is an **object literal** — commas between methods or `tsc` dies (`TS1005`) |
@@ -114,7 +118,7 @@ Worker tools + SSE health went live via CLI (not CI).
 Tests (no npm test script):
 
 ```bash
-node --experimental-strip-types --test src/lib/buddy-library.test.ts src/lib/buddy/persona.test.ts src/lib/buddy-catalog.test.ts src/lib/buddy-intent.test.ts src/lib/taste-rank.test.ts src/lib/catalog-search.test.ts src/lib/buddy-session.test.ts
+node --experimental-strip-types --test src/lib/buddy-library.test.ts src/lib/buddy/persona.test.ts src/lib/buddy-catalog.test.ts src/lib/buddy-intent.test.ts src/lib/taste-rank.test.ts src/lib/catalog-search.test.ts src/lib/buddy-session.test.ts src/lib/time-budget.test.ts src/lib/airing.test.ts
 node node_modules/typescript/bin/tsc -b --pretty false
 ```
 
@@ -155,6 +159,9 @@ If you lack Cloudflare credentials: say so. Do not pretend it deployed. CI Worke
 Suggested order, small PRs:
 
 1. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
+2. AniList username import (public list → confirm → IndexedDB) — biggest onboarding unlock.
+3. Profile stats charts with the already-shipped recharts (genre radar, hours/month).
+4. Polish write-intent variants for the 0.3.23 actions (favorite/note/remove/rewatch) — currently EN-only.
 
 Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 
@@ -168,8 +175,10 @@ Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 - `what am I watching` / `co oglądam` → library cards  
 - `znajdź Spy x Family` / `spy x family` → catalog  
 - `compare Naruto and Bleach` / `porównaj Naruto z Bleach` / `Naruto vs Bleach` → side-by-side card  
+- `favorite Naruto` / `note Frieren: quiet and warm` / `rewatch Bleach` / `unrate Naruto` → confirm cards  
 - `ile odcinków ma One Piece` → AniList facts + cover  
 - Home **For you** after rating something  
+- Buddy **History** button → reopen an older chat (cards come back)
 
 ---
 

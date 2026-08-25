@@ -301,3 +301,22 @@ export interface SpoilerState {
   maxEpisodeSeen: number;
   updatedAt: number;
 }
+
+// ---------- Scan history ----------
+
+/** One figurine/art scan — the "shelf" of things you pointed the camera at. */
+export interface ScanRecord {
+  id: string;
+  /** Matched anime (primary match at scan time). */
+  anilistId?: number;
+  title?: string;
+  coverImage?: string;
+  characterId?: number;
+  characterName?: string;
+  /** 0..1 vision confidence. */
+  confidence?: number;
+  objectType?: string;
+  /** The captured photo, stored locally (never uploaded anywhere but the Worker). */
+  image?: Blob;
+  createdAt: number;
+}

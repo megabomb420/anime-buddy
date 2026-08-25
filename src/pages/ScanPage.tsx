@@ -11,6 +11,7 @@ import {
 } from "@/lib/services/VisionService";
 import { persistence } from "@/lib/db/persistence";
 import { undoToast } from "@/lib/undo";
+import type { ScanRecord } from "@/types/entities";
 import { blobToObjectUrl } from "@/lib/image/compress";
 import { getWorkerUrl } from "@/lib/worker-gateway";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,11 @@ function MatchCard({ match, featured, onAdd }: { match: CatalogMatch; featured?:
                 <Link to={`/character/${match.character.id}`}>Character</Link>
               </Button>
             )}
+            <Button asChild size="sm" variant="secondary" className="h-8 rounded-full">
+              <Link to="/buddy" state={{ prefill: `Tell me about ${titleOf(anime)}` }}>
+                Ask Ren
+              </Link>
+            </Button>
             <Button size="sm" variant="secondary" className="h-8 rounded-full" onClick={() => onAdd(anime.anilistId)}>
               <Plus className="size-3.5" />
               Plan to watch
@@ -76,6 +82,56 @@ function MatchCard({ match, featured, onAdd }: { match: CatalogMatch; featured?:
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** One past scan: the captured photo, linking back to the matched anime. */
+function RecentScanItem({
+  record,
+  onOpen,
+  onDelete,
+}: {
+  record: ScanRecord;
+  onOpen: (record: ScanRecord) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!record.image) return;
+    const u = URL.createObjectURL(record.image);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [record.image]);
+
+  return (
+    <div className="relative w-16 shrink-0">
+      <button
+        type="button"
+        onClick={() => onOpen(record)}
+        className="block w-full text-left"
+        aria-label={record.title ?? "Past scan"}
+      >
+        <div className="h-20 w-16 overflow-hidden rounded-md bg-muted">
+          {url ? (
+            <img src={url} alt="" className="h-full w-full object-cover" />
+          ) : record.coverImage ? (
+            <img src={record.coverImage} alt="" className="h-full w-full object-cover" loading="lazy" />
+          ) : null}
+        </div>
+        <p className="mt-1 line-clamp-2 text-[10px] leading-tight text-muted-foreground">
+          {record.title ?? "No match"}
+        </p>
+      </button>
+      <button
+        type="button"
+        onClick={() => onDelete(record.id)}
+        aria-label="Delete scan"
+        className="absolute -right-1 -top-1 flex size-5 items-center justify-center rounded-full bg-background text-muted-foreground shadow"
+      >
+        <X className="size-3" />
+      </button>
     </div>
   );
 }
@@ -92,6 +148,11 @@ export default function ScanPage() {
   const [blob, setBlob] = useState<Blob | null>(null);
   const [outcome, setOutcome] = useState<ScanOutcome | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const [recentScans, setRecentScans] = useState<ScanRecord[]>([]);
+
+  useEffect(() => {
+    void persistence.getScanRecords().then(setRecentScans).catch(() => undefined);
+  }, []);
 
   function stopStream() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -158,6 +219,20 @@ export default function ScanPage() {
       if (gen !== identifyGen.current) return;
       setOutcome(result);
       setPhase("results");
+      const top = result.matches[0];
+      const saved = await persistence
+        .addScanRecord({
+          anilistId: top?.anime.anilistId,
+          title: top ? titleOf(top.anime) : undefined,
+          coverImage: top?.anime.coverImage,
+          characterId: top?.character?.id,
+          characterName: top?.character?.name,
+          confidence: result.recognition.confidence,
+          objectType: result.recognition.objectType,
+          image: shot,
+        })
+        .catch(() => null);
+      if (saved) setRecentScans((prev) => [saved, ...prev].slice(0, 12));
     } catch {
       if (gen !== identifyGen.current) return;
       setPhase("error");
@@ -202,8 +277,16 @@ export default function ScanPage() {
     void startCamera(facing);
   }
 
-  async function addToLibrary(id: number) {
-    const prev = await persistence.getLibraryEntry(id);
+  function openRecentScan(record: ScanRecord) {
+    if (record.anilistId) navigate(`/anime/${record.anilistId}`);
+  }
+
+  async function deleteScan(id: string) {
+    await persistence.deleteScanRecord(id);
+    setRecentScans((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  async function addToLibrary(id: number) {    const prev = await persistence.getLibraryEntry(id);
     await persistence.setLibraryStatus(id, "plan_to_watch");
     undoToast("Added to Want to Watch", async () => {
       if (prev) await persistence.restoreLibraryEntry(prev);
@@ -282,6 +365,19 @@ export default function ScanPage() {
               <ImagePlus className="size-4" />
               Use a photo
             </Button>
+
+            {recentScans.length > 0 && (
+              <div className="space-y-2 pt-2 text-left">
+                <p className="text-center text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  Recent scans
+                </p>
+                <div className="flex gap-3 overflow-x-auto px-1 pb-1 pt-2">
+                  {recentScans.map((r) => (
+                    <RecentScanItem key={r.id} record={r} onOpen={openRecentScan} onDelete={(id) => void deleteScan(id)} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

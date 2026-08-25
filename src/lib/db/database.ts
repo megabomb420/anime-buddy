@@ -29,6 +29,7 @@ import type {
   Message,
   RecommendationFeedback,
   RecommendationRecord,
+  ScanRecord,
   SemanticMemory,
   Settings,
   SpoilerState,
@@ -40,7 +41,7 @@ import type {
 } from "@/types/entities";
 
 export const DB_NAME = "anime-buddy";
-export const DB_SCHEMA_VERSION = 2;
+export const DB_SCHEMA_VERSION = 3;
 
 export class AnimeBuddyDB extends Dexie {
   userProfiles!: Table<UserProfile, string>;
@@ -66,6 +67,7 @@ export class AnimeBuddyDB extends Dexie {
   conversations!: Table<Conversation, string>;
   messages!: Table<Message, string>;
   spoilerStates!: Table<SpoilerState, number>;
+  scanRecords!: Table<ScanRecord, string>;
   settings!: Table<Settings, string>;
 
   constructor() {
@@ -101,6 +103,11 @@ export class AnimeBuddyDB extends Dexie {
     // v2 — permanent "Not for me" exclusions.
     this.version(2).stores({
       hiddenAnime: "anilistId, createdAt",
+    });
+
+    // v3 — scan history (the figurine "shelf").
+    this.version(3).stores({
+      scanRecords: "id, anilistId, createdAt",
     });
 
     // Example for future migrations — add a new version, never edit v1:
