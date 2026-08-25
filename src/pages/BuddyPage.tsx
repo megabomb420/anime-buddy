@@ -4,15 +4,18 @@ import {
   ArrowUp,
   Clock,
   Flame,
+  History,
   Moon,
   Shield,
   Smile,
   Sparkles,
   SquarePen,
+  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { RecPickCard, recPickFromAnime, type RecPick } from "@/components/anime/RecPickCard";
 import { CompareCard } from "@/components/anime/CompareCard";
 import { LibraryConfirmCard } from "@/components/anime/LibraryConfirmCard";
@@ -47,7 +50,7 @@ import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
 import { tasteService } from "@/lib/services/TasteService";
 import { getWorkerUrl } from "@/lib/worker-gateway";
 import { cn } from "@/lib/utils";
-import type { Conversation, LibraryStatus } from "@/types/entities";
+import type { Conversation, LibraryStatus, Message, MessagePayload } from "@/types/entities";
 import type { AnimeSummary } from "@/types/anime";
 
 interface UiMessage {
@@ -103,6 +106,50 @@ const ACTION_LABELS: Record<string, string> = {
   note: "Confirm · Save note",
   rewatch: "Confirm · Start rewatch",
 };
+
+/** Stored message → UI message (rich cards come back from the payload). */
+function toUiMessage(m: Message): UiMessage | null {
+  if (m.role !== "user" && m.role !== "assistant") return null;
+  const p = m.payload;
+  return {
+    role: m.role,
+    content: m.content,
+    polish: p?.polish,
+    picks: p?.picks,
+    libraryConfirm: p?.libraryConfirm,
+    rateConfirm: p?.rateConfirm,
+    actionConfirm: p?.actionConfirm,
+    compare: p?.compare,
+  };
+}
+
+/** Keep only the card fields that exist; undefined when the reply is plain text. */
+function payloadFrom(base: Partial<UiMessage>): MessagePayload | undefined {
+  const payload: MessagePayload = {
+    polish: base.polish,
+    picks: base.picks,
+    libraryConfirm: base.libraryConfirm,
+    rateConfirm: base.rateConfirm,
+    actionConfirm: base.actionConfirm,
+    compare: base.compare,
+  };
+  return payload.picks ||
+    payload.libraryConfirm ||
+    payload.rateConfirm ||
+    payload.actionConfirm ||
+    payload.compare ||
+    payload.polish
+    ? payload
+    : undefined;
+}
+
+async function persistAssistantReply(
+  conversationId: string,
+  reply: string,
+  base: Partial<UiMessage>,
+): Promise<void> {
+  await memoryService.appendMessage(conversationId, "assistant", reply, payloadFrom(base));
+}
 
 async function catalogPicksFor(text: string): Promise<{ picks: RecPick[]; factsText: string }> {
   if (!wantsRecommendation(text)) return { picks: [], factsText: "" };
@@ -201,6 +248,8 @@ export default function BuddyPage() {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const live = Boolean(getWorkerUrl());
   const location = useLocation();
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -227,8 +276,8 @@ export default function BuddyPage() {
       setConversation(latest);
       setMessages(
         history
-          .filter((m) => m.role === "user" || m.role === "assistant")
-          .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+          .map(toUiMessage)
+          .filter((m): m is UiMessage => m !== null),
       );
     })();
   }, []);
@@ -253,6 +302,28 @@ export default function BuddyPage() {
     setMessages([]);
     setInput("");
     inputRef.current?.focus();
+  }
+
+  async function openHistory() {
+    setConversations(await persistence.listConversations());
+    setHistoryOpen(true);
+  }
+
+  async function openConversation(c: Conversation) {
+    if (sending) return;
+    const history = await memoryService.getHistory(c.id);
+    setConversation(c);
+    setMessages(history.map(toUiMessage).filter((m): m is UiMessage => m !== null));
+    setHistoryOpen(false);
+  }
+
+  async function deleteConversationById(id: string) {
+    await persistence.deleteConversation(id);
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (conversation?.id === id) {
+      setConversation(null);
+      setMessages([]);
+    }
   }
 
   function applyPrefix(prefix: string) {
@@ -470,6 +541,11 @@ export default function BuddyPage() {
     try {
       const convo = await ensureConvo();
       await memoryService.appendMessage(convo.id, "user", text);
+      if (!convo.title) {
+        const title = text.length > 48 ? `${text.slice(0, 47)}…` : text;
+        void persistence.renameConversation(convo.id, title);
+        setConversation({ ...convo, title });
+      }
       const next: UiMessage[] = [...messagesRef.current, { role: "user", content: text, polish }];
       setMessages(next);
 
@@ -481,20 +557,21 @@ export default function BuddyPage() {
           titles.length > 1
             ? libraryBatchPromptReply(write.status, candidates.length, titles.length, polish)
             : libraryPromptReply(write.status, candidates.length, polish, write.progress);
-        await memoryService.appendMessage(convo.id, "assistant", reply);
+        const libraryConfirm =
+          candidates.length > 0
+            ? {
+                status: write.status,
+                picks: candidates,
+                progress: write.progress,
+                reason: write.reason,
+              }
+            : undefined;
+        await persistAssistantReply(convo.id, reply, { polish, libraryConfirm });
         await revealAssistant(
           {
             role: "assistant",
             polish,
-            libraryConfirm:
-              candidates.length > 0
-                ? {
-                    status: write.status,
-                    picks: candidates,
-                    progress: write.progress,
-                    reason: write.reason,
-                  }
-                : undefined,
+            libraryConfirm,
           },
           reply,
         );
@@ -505,13 +582,14 @@ export default function BuddyPage() {
         const titles = write.titles.length ? write.titles : [write.query];
         const candidates = await libraryCandidatesForTitles(titles);
         const reply = ratePromptReply(write.score, candidates.length, polish);
-        await memoryService.appendMessage(convo.id, "assistant", reply);
+        const rateConfirm =
+          candidates.length > 0 ? { score: write.score, picks: candidates } : undefined;
+        await persistAssistantReply(convo.id, reply, { polish, rateConfirm });
         await revealAssistant(
           {
             role: "assistant",
             polish,
-            rateConfirm:
-              candidates.length > 0 ? { score: write.score, picks: candidates } : undefined,
+            rateConfirm,
           },
           reply,
         );
@@ -527,22 +605,23 @@ export default function BuddyPage() {
       ) {
         const titles = write.titles.length ? write.titles : [write.query];
         const candidates = await libraryCandidatesForTitles(titles);
-        const action =
+        const action: "favorite" | "unfavorite" | "remove" | "unrate" | "note" | "rewatch" =
           write.kind === "favorite" && write.unfavorite ? "unfavorite" : write.kind;
         const reply = actionPromptReply(action, candidates.length, polish);
-        await memoryService.appendMessage(convo.id, "assistant", reply);
+        const actionConfirm =
+          candidates.length > 0
+            ? {
+                action,
+                picks: candidates,
+                note: write.kind === "note" ? write.note : undefined,
+              }
+            : undefined;
+        await persistAssistantReply(convo.id, reply, { polish, actionConfirm });
         await revealAssistant(
           {
             role: "assistant",
             polish,
-            actionConfirm:
-              candidates.length > 0
-                ? {
-                    action,
-                    picks: candidates,
-                    note: write.kind === "note" ? write.note : undefined,
-                  }
-                : undefined,
+            actionConfirm,
           },
           reply,
         );
@@ -562,7 +641,7 @@ export default function BuddyPage() {
           }
         }
         const reply = libraryReadReply(libraryRead.status, picks.length, polish);
-        await memoryService.appendMessage(convo.id, "assistant", reply);
+        await persistAssistantReply(convo.id, reply, { polish, picks: picks.length ? picks : undefined });
         await revealAssistant(
           {
             role: "assistant",
@@ -587,13 +666,19 @@ export default function BuddyPage() {
             : `Couldn't pin down “${missing}” in the AniList catalog. Try a clearer title.`;
         }
         const found = a ?? b;
-        await memoryService.appendMessage(convo.id, "assistant", reply);
+        const comparePayload = a && b ? { a, b } : undefined;
+        const comparePicks = !(a && b) && found ? [recPickFromAnime(found)] : undefined;
+        await persistAssistantReply(convo.id, reply, {
+          polish,
+          compare: comparePayload,
+          picks: comparePicks,
+        });
         await revealAssistant(
           {
             role: "assistant",
             polish,
-            compare: a && b ? { a, b } : undefined,
-            picks: !(a && b) && found ? [recPickFromAnime(found)] : undefined,
+            compare: comparePayload,
+            picks: comparePicks,
           },
           reply,
         );
@@ -604,7 +689,10 @@ export default function BuddyPage() {
       if (lookup) {
         const candidates = await libraryCandidates(lookup);
         const reply = lookupReply(lookup, candidates.length, polish);
-        await memoryService.appendMessage(convo.id, "assistant", reply);
+        await persistAssistantReply(convo.id, reply, {
+          polish,
+          picks: candidates.length > 0 ? candidates : undefined,
+        });
         await revealAssistant(
           {
             role: "assistant",
@@ -673,7 +761,10 @@ export default function BuddyPage() {
 
       const shownPicks = mergePicks(picks, workerPicks);
 
-      await memoryService.appendMessage(convo.id, "assistant", reply);
+      await persistAssistantReply(convo.id, reply, {
+        polish,
+        picks: shownPicks.length ? shownPicks : undefined,
+      });
       if (!added) {
         setMessages((prev) => [...prev, { role: "assistant", content: reply, polish, picks: shownPicks }]);
       } else {
@@ -704,6 +795,17 @@ export default function BuddyPage() {
             {live ? "DeepSeek · live" : "Local until the Worker is connected"}
           </p>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-10 rounded-full"
+          aria-label="Chat history"
+          disabled={sending}
+          onClick={() => void openHistory()}
+        >
+          <History className="size-4" />
+        </Button>
         <Button
           type="button"
           variant="ghost"
@@ -913,6 +1015,56 @@ export default function BuddyPage() {
           </Button>
         </div>
       </form>
+
+      <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+        <SheetContent side="left" className="flex w-[85%] max-w-sm flex-col gap-0 p-0">
+          <SheetHeader className="border-b border-border px-4 py-3">
+            <SheetTitle>Chats</SheetTitle>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+            {conversations.length === 0 ? (
+              <p className="px-2 py-6 text-sm text-muted-foreground">No past chats yet.</p>
+            ) : (
+              <ul className="space-y-1 pt-2">
+                {conversations.map((c) => (
+                  <li key={c.id} className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void openConversation(c)}
+                      className={cn(
+                        "min-w-0 flex-1 rounded-lg px-3 py-2.5 text-left hover:bg-accent",
+                        c.id === conversation?.id && "bg-accent",
+                      )}
+                    >
+                      <p className="truncate text-sm font-medium">{c.title || "Chat"}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {new Date(c.updatedAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        {" · "}
+                        {new Date(c.updatedAt).toLocaleTimeString(undefined, {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 shrink-0 text-muted-foreground"
+                      aria-label="Delete chat"
+                      onClick={() => void deleteConversationById(c.id)}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

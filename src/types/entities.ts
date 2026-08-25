@@ -10,6 +10,7 @@
 
 import type { AgeGuide } from "./age";
 import type { AnimeSummary, CharacterSummary, CrunchyrollAvailability } from "./anime";
+import type { RecPick } from "../components/anime/RecPickCard";
 
 // ---------- Profile & settings ----------
 
@@ -256,11 +257,38 @@ export interface Conversation {
 
 export type MessageRole = "user" | "assistant" | "system";
 
+/** Structured card data attached to assistant messages — restored on reload. */
+export interface MessagePayload {
+  polish?: boolean;
+  picks?: RecPick[];
+  libraryConfirm?: {
+    status: LibraryStatus;
+    picks: RecPick[];
+    progress?: number;
+    reason?: string;
+  };
+  rateConfirm?: {
+    score: number;
+    picks: RecPick[];
+  };
+  actionConfirm?: {
+    action: "favorite" | "unfavorite" | "remove" | "unrate" | "note" | "rewatch";
+    picks: RecPick[];
+    note?: string;
+  };
+  compare?: {
+    a: AnimeSummary;
+    b: AnimeSummary;
+  };
+}
+
 export interface Message {
   id: string;
   conversationId: string;
   role: MessageRole;
   content: string;
+  /** Rich cards (picks / confirms / compare) for assistant messages. */
+  payload?: MessagePayload;
   createdAt: number;
 }
 

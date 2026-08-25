@@ -24,8 +24,9 @@ export class MemoryService {
     conversationId: string,
     role: MessageRole,
     content: string,
+    payload?: Message["payload"],
   ): Promise<Message> {
-    return persistence.addMessage({ conversationId, role, content });
+    return persistence.addMessage({ conversationId, role, content, payload });
   }
 
   async getHistory(conversationId: string): Promise<Message[]> {

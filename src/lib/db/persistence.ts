@@ -371,6 +371,19 @@ export const persistence = {
     return db.messages.where("conversationId").equals(conversationId).sortBy("createdAt");
   },
 
+  async listConversations(): Promise<Conversation[]> {
+    return db.conversations.orderBy("updatedAt").reverse().toArray();
+  },
+
+  async renameConversation(id: string, title: string): Promise<void> {
+    await db.conversations.update(id, { title });
+  },
+
+  async deleteConversation(id: string): Promise<void> {
+    await db.messages.where("conversationId").equals(id).delete();
+    await db.conversations.delete(id);
+  },
+
   async saveRecommendation(
     input: Omit<RecommendationRecord, "id" | "createdAt">,
   ): Promise<RecommendationRecord> {
