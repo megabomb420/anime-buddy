@@ -1,16 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Scatter,
-  ScatterChart,
-  Tooltip as RechartsTooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import {
   BarChart3,
   Download,
@@ -47,6 +36,22 @@ import type {
 } from "@/types/entities";
 import { APP_BUILT_AT, APP_COMMIT, APP_VERSION, checkForUpdate } from "@/lib/app-version";
 import type { VersionCheck } from "@/lib/app-version";
+
+const GenreChart = lazy(() =>
+  import("@/components/profile/ProfileCharts").then((m) => ({ default: m.GenreChart })),
+);
+const ScoreCompareChart = lazy(() =>
+  import("@/components/profile/ProfileCharts").then((m) => ({ default: m.ScoreCompareChart })),
+);
+
+function ChartSkeleton({ className }: { className: string }) {
+  return (
+    <div
+      className={`animate-pulse rounded-xl border border-border bg-card ${className}`}
+      aria-hidden
+    />
+  );
+}
 
 interface Stats {
   completed: number;
@@ -320,31 +325,9 @@ export default function ProfilePage() {
           )}
         </div>
         {genreChart.length >= 3 && (
-          <div className="h-48 rounded-xl border border-border bg-card p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={genreChart} layout="vertical" margin={{ left: 4, right: 12, top: 4, bottom: 4 }}>
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="genre"
-                  width={92}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <RechartsTooltip
-                  cursor={{ fill: "hsl(var(--accent))" }}
-                  contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                />
-                <Bar dataKey="weight" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <Suspense fallback={<ChartSkeleton className="h-48" />}>
+            <GenreChart data={genreChart} />
+          </Suspense>
         )}
         {Object.keys(genreDistribution).length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -394,41 +377,9 @@ export default function ProfilePage() {
             {avgDelta >= 0 ? "higher" : "lower"} than the AniList crowd on average (
             {scoreCompare.length} rated). X = AniList score, Y = yours.
           </p>
-          <div className="h-56 rounded-xl border border-border bg-card p-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-                <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
-                <XAxis
-                  type="number"
-                  dataKey="anilist"
-                  domain={[0, 10]}
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                />
-                <YAxis
-                  type="number"
-                  dataKey="yours"
-                  domain={[0, 10]}
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  tickLine={false}
-                />
-                <RechartsTooltip
-                  cursor={{ strokeDasharray: "3 3" }}
-                  contentStyle={{
-                    background: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  formatter={(value, name) => [value, name === "anilist" ? "AniList" : "You"]}
-                  labelFormatter={(_, payload) =>
-                    (payload?.[0]?.payload as { title?: string } | undefined)?.title ?? ""
-                  }
-                />
-                <Scatter data={scoreCompare} fill="hsl(var(--primary))" />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
+          <Suspense fallback={<ChartSkeleton className="h-56" />}>
+            <ScoreCompareChart data={scoreCompare} />
+          </Suspense>
         </section>
       )}
 

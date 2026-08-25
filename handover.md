@@ -1,7 +1,7 @@
 # Anime Buddy — Handover (for the next agent)
 
 **Date:** 2026-08-25  
-**App version:** `0.3.30` (live)  
+**App version:** `0.3.31` (live)  
 **HEAD:** `main` @ 0.3.20 (see `git log -1`)  
 **Live PWA:** https://megabomb420.github.io/anime-buddy/  
 **Source:** https://github.com/megabomb420/anime-buddy  
@@ -50,13 +50,13 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 
 | Surface | State |
 | --- | --- |
-| Pages | **v0.3.30** — `version.json` must match `package.json` |
+| Pages | **v0.3.31** — `version.json` must match `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live (CLI deploy). Persona includes spoiler lock. |
 | Worker GitHub Action | **Green since 2026-08-24** (run attempt 3, commit `9de5d10`). Secrets live in Settings → Secrets → **Actions**; account ID `d357be58f5550eea081b0c8d80824abf` (Whip Blanket). Token = Cloudflare **Edit Cloudflare Workers** template |
 | Owner CLI | `wrangler` logged in as `przemek.fall@gmail.com` / account Whip Blanket. CLI deploy still works as fallback; CI is primary |
 
-If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.30**.
+If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.31**.
 
 ```bash
 curl -s https://megabomb420.github.io/anime-buddy/version.json
@@ -89,6 +89,7 @@ curl -s https://anime-buddy-worker.whip-blanket.workers.dev/api/health
 | 0.3.28 | **Scan history** — DB schema v3 `scanRecords` (photo blob + matched title/character stored locally). Intro screen shows **Recent scans** (tap → anime detail, X deletes). Match cards gain **Ask Ren** → Buddy prefill |
 | 0.3.29 | **AniList import** — Profile → Import from AniList: public `MediaListCollection` (chunked, max 10×500), status map (REPEATING → watching + rewatch), POINT_10 scores → ratings. Preview with per-status counts, confirm before writing. `src/lib/anilist-import.ts` (DB-free, unit-tested) + `anilist-import-apply.ts` (write step) |
 | 0.3.30 | **Profile charts** — recharts finally used: genre-weight horizontal bars in Taste DNA (top 8 positive) + **You vs the crowd** scatter (your score vs AniList, avg delta caption). Note: main chunk now >500 kB — code-splitting is future debt |
+| 0.3.31 | **Code-splitting** — recharts moved to `src/components/profile/ProfileCharts.tsx` behind `React.lazy` + `Suspense` (skeleton fallback); all routes except Home/Discover lazy in `App.tsx`. Entry chunk 1140 → 508 kB (gzip 337 → 163 kB); charts (396 kB) load only on Profile |
 | 0.3.16 | **Session recap** — `src/lib/buddy-session.ts`: chats longer than 12 messages send a deterministic `[Earlier in this chat — recap]` (logged / rated / looked-up / rec asks) + last 11 verbatim to the Worker. Token save without Ren forgetting; no Worker change |
 | 0.3.17 | **Compare two titles** — `parseCompareQuery` in `catalog-search.ts` + `src/components/anime/CompareCard.tsx`: `compare X and Y` / `porównaj X z Y` / `X vs Y` → side-by-side AniList facts (score, episodes, status, format, season, genres, studio). No DeepSeek |
 
@@ -120,7 +121,7 @@ Worker tools + SSE health went live via CLI (not CI).
 Tests (no npm test script):
 
 ```bash
-node --experimental-strip-types --test src/lib/buddy-library.test.ts src/lib/buddy/persona.test.ts src/lib/buddy-catalog.test.ts src/lib/buddy-intent.test.ts src/lib/taste-rank.test.ts src/lib/catalog-search.test.ts src/lib/buddy-session.test.ts src/lib/time-budget.test.ts src/lib/airing.test.ts
+node --experimental-strip-types --test src/lib/buddy-library.test.ts src/lib/buddy/persona.test.ts src/lib/buddy-catalog.test.ts src/lib/buddy-intent.test.ts src/lib/taste-rank.test.ts src/lib/catalog-search.test.ts src/lib/buddy-session.test.ts src/lib/time-budget.test.ts src/lib/airing.test.ts src/lib/anilist-import.test.ts src/lib/buddy-type.test.ts
 node node_modules/typescript/bin/tsc -b --pretty false
 ```
 
@@ -161,10 +162,9 @@ If you lack Cloudflare credentials: say so. Do not pretend it deployed. CI Worke
 Suggested order, small PRs:
 
 1. Hardware Scan QA on a real phone (file-upload path was tested; camera was not).
-2. Code-split the bundle (main chunk > 500 kB since recharts landed — lazy-load Profile charts and/or routes).
-3. Polish write-intent variants for the 0.3.23 actions (favorite/note/remove/rewatch) — currently EN-only.
-4. "This week" rail on Home (new episodes of shows you watch via `getAiringFor` + season premieres).
-5. Shareable Taste DNA card (canvas → PNG).
+2. "This week" rail on Home (new episodes of shows you watch via `getAiringFor` + season premieres).
+3. Shareable Taste DNA card (canvas → PNG).
+4. Polish write-intent variants for the 0.3.23 actions (favorite/note/remove/rewatch) — currently EN-only.
 
 Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 
