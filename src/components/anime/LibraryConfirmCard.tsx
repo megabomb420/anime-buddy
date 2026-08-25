@@ -14,6 +14,7 @@ export function LibraryConfirmCard({
   polish,
   progress,
   score,
+  action,
   onConfirm,
 }: {
   pick: RecPick;
@@ -22,6 +23,8 @@ export function LibraryConfirmCard({
   progress?: number;
   /** When set, this card confirms a rating instead of a library status. */
   score?: number;
+  /** Full override for the confirm button label (favorite/remove/note/rewatch). */
+  action?: string;
   onConfirm: (pick: RecPick) => Promise<void> | void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -33,7 +36,9 @@ export function LibraryConfirmCard({
   const alScore = anilistScore10(pick.anilistScore);
 
   let actionLabel: string;
-  if (score != null) {
+  if (action) {
+    actionLabel = action;
+  } else if (score != null) {
     actionLabel = polish ? `Zatwierdź · ${score}/10` : `Confirm · ${score}/10`;
   } else if (status) {
     const label = libraryStatusLabel(status, polish);

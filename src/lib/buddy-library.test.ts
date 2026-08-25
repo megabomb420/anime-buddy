@@ -1,9 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  parseBuddyWriteIntent,
+  parseFavoriteIntent,
   parseLibraryIntent,
   parseLibraryReadIntent,
+  parseNoteIntent,
   parseRateIntent,
+  parseRemoveIntent,
+  parseRewatchIntent,
+  parseUnrateIntent,
   splitTitleList,
 } from "./buddy-library.ts";
 
@@ -111,5 +117,84 @@ describe("parseLibraryReadIntent", () => {
     assert.equal(parseLibraryReadIntent("oglądam One Piece"), null);
     assert.equal(parseLibraryReadIntent("co oglądać wieczorem"), null);
     assert.equal(parseLibraryReadIntent("what should I watch"), null);
+  });
+});
+
+describe("parseFavoriteIntent", () => {
+  it("parses favorite / fav / add to favorites", () => {
+    assert.equal(parseFavoriteIntent("favorite Naruto")?.query, "Naruto");
+    assert.equal(parseFavoriteIntent("fav Frieren")?.query, "Frieren");
+    assert.equal(parseFavoriteIntent("add One Piece to favorites")?.query, "One Piece");
+    assert.equal(parseFavoriteIntent("add One Piece to my favourites")?.query, "One Piece");
+  });
+
+  it("parses unfavorite variants", () => {
+    const a = parseFavoriteIntent("unfavorite Naruto");
+    assert.equal(a?.unfavorite, true);
+    assert.equal(a?.query, "Naruto");
+    const b = parseFavoriteIntent("remove Bleach from favorites");
+    assert.equal(b?.unfavorite, true);
+    assert.equal(b?.query, "Bleach");
+  });
+
+  it("does not steal plain titles", () => {
+    assert.equal(parseFavoriteIntent("Naruto"), null);
+  });
+});
+
+describe("parseRemoveIntent", () => {
+  it("parses remove from library / list", () => {
+    assert.equal(parseRemoveIntent("remove Naruto from my library")?.query, "Naruto");
+    assert.equal(parseRemoveIntent("delete Bleach from my list")?.query, "Bleach");
+  });
+
+  it("does not steal favorite removals", () => {
+    assert.equal(parseRemoveIntent("remove Naruto from favorites"), null);
+  });
+});
+
+describe("parseUnrateIntent", () => {
+  it("parses unrate and remove rating", () => {
+    assert.equal(parseUnrateIntent("unrate Naruto")?.query, "Naruto");
+    assert.equal(parseUnrateIntent("remove my rating for Bleach")?.query, "Bleach");
+    assert.equal(parseUnrateIntent("remove rating of One Piece")?.query, "One Piece");
+  });
+});
+
+describe("parseNoteIntent", () => {
+  it("requires a colon and splits title from note", () => {
+    const intent = parseNoteIntent("note Naruto: great fights, weak pacing");
+    assert.equal(intent?.query, "Naruto");
+    assert.equal(intent?.note, "great fights, weak pacing");
+  });
+
+  it("supports note for X", () => {
+    const intent = parseNoteIntent("note for Frieren: quiet and warm");
+    assert.equal(intent?.query, "Frieren");
+    assert.equal(intent?.note, "quiet and warm");
+  });
+
+  it("ignores note-like text without a body", () => {
+    assert.equal(parseNoteIntent("note Naruto"), null);
+  });
+});
+
+describe("parseRewatchIntent", () => {
+  it("parses rewatch variants", () => {
+    assert.equal(parseRewatchIntent("rewatch Naruto")?.query, "Naruto");
+    assert.equal(parseRewatchIntent("rewatching Frieren")?.query, "Frieren");
+    assert.equal(parseRewatchIntent("re-watch Bleach")?.query, "Bleach");
+  });
+});
+
+describe("parseBuddyWriteIntent order", () => {
+  it("new intents win over library patterns where ambiguous", () => {
+    assert.equal(parseBuddyWriteIntent("add Naruto to my list")?.kind, "library");
+    assert.equal(parseBuddyWriteIntent("add Naruto to favorites")?.kind, "favorite");
+    assert.equal(parseBuddyWriteIntent("remove Naruto from my library")?.kind, "remove");
+    assert.equal(parseBuddyWriteIntent("note Naruto: great")?.kind, "note");
+    assert.equal(parseBuddyWriteIntent("rewatch Naruto")?.kind, "rewatch");
+    assert.equal(parseBuddyWriteIntent("unrate Naruto")?.kind, "unrate");
+    assert.equal(parseBuddyWriteIntent("rate 9 Naruto")?.kind, "rate");
   });
 });

@@ -234,6 +234,27 @@ export const persistence = {
     await db.animeRatings.put(rating);
   },
 
+  async isFavoriteAnime(anilistId: number): Promise<boolean> {
+    return Boolean(await db.favoriteAnime.get(anilistId));
+  },
+
+  /** Buddy "rewatch X": back to watching at ep 0, bump the rewatch counter. */
+  async rewatchAnime(anilistId: number): Promise<LibraryEntry> {
+    const existing = await db.libraryEntries.get(anilistId);
+    const entry: LibraryEntry = {
+      anilistId,
+      status: "watching",
+      progress: 0,
+      rewatchCount: (existing?.rewatchCount ?? 0) + 1,
+      startedAt: now(),
+      completedAt: undefined,
+      updatedAt: now(),
+    };
+    await db.libraryEntries.put(entry);
+    await db.viewingProgress.put({ anilistId, episode: 0, updatedAt: now() });
+    return entry;
+  },
+
   async getFavoriteAnime(): Promise<FavoriteAnime[]> {
     return db.favoriteAnime.toArray();
   },

@@ -18,6 +18,8 @@ import { CompareCard } from "@/components/anime/CompareCard";
 import { LibraryConfirmCard } from "@/components/anime/LibraryConfirmCard";
 import { BUDDY_CHIPS, interpretBuddyQuery, wantsRecommendation } from "@/lib/buddy-intent";
 import {
+  actionDoneReply,
+  actionPromptReply,
   libraryBatchPromptReply,
   libraryDoneReply,
   libraryPromptReply,
@@ -37,6 +39,7 @@ import { animeTitle } from "@/lib/media";
 import { looksPolish } from "@/lib/buddy/persona";
 import { typeOut } from "@/lib/buddy-type";
 import { persistence } from "@/lib/db/persistence";
+import { db } from "@/lib/db/database";
 import { memoryService } from "@/lib/services/MemoryService";
 import { streamAsBuddy } from "@/lib/services/BuddyChatService";
 import { recommendationService } from "@/lib/services/RecommendationService";
@@ -63,6 +66,11 @@ interface UiMessage {
     score: number;
     picks: RecPick[];
   };
+  actionConfirm?: {
+    action: "favorite" | "unfavorite" | "remove" | "unrate" | "note" | "rewatch";
+    picks: RecPick[];
+    note?: string;
+  };
   compare?: {
     a: AnimeSummary;
     b: AnimeSummary;
@@ -86,6 +94,15 @@ const LOG_PREFIXES = [
 ];
 
 const LIBRARY_CHIPS = [{ label: "What am I watching?", query: "what am I watching" }];
+
+const ACTION_LABELS: Record<string, string> = {
+  favorite: "Confirm · ★ Favorite",
+  unfavorite: "Confirm · Unfavorite",
+  remove: "Confirm · Remove from library",
+  unrate: "Confirm · Remove rating",
+  note: "Confirm · Save note",
+  rewatch: "Confirm · Start rewatch",
+};
 
 async function catalogPicksFor(text: string): Promise<{ picks: RecPick[]; factsText: string }> {
   if (!wantsRecommendation(text)) return { picks: [], factsText: "" };
@@ -319,6 +336,80 @@ export default function BuddyPage() {
     await revealAssistant({ role: "assistant", content: "", polish }, reply);
   }
 
+  async function confirmAction(
+    action: "favorite" | "unfavorite" | "remove" | "unrate" | "note" | "rewatch",
+    pick: RecPick,
+    polish: boolean,
+    note?: string,
+  ) {
+    const spam = checkConfirmSpam();
+    if (spam.ok === false && spam.reason) {
+      const reply = spamReply(spam.reason, polish);
+      const convo = await ensureConvo();
+      await memoryService.appendMessage(convo.id, "assistant", reply);
+      await revealAssistant({ role: "assistant", content: "", polish }, reply);
+      return;
+    }
+
+    const id = pick.anilistId;
+    const title = animeTitle(pick);
+
+    if (action === "favorite" || action === "unfavorite") {
+      const wasFav = await persistence.isFavoriteAnime(id);
+      if (action === "favorite") await persistence.addFavoriteAnime(id);
+      else await persistence.removeFavoriteAnime(id);
+      undoToast(
+        action === "favorite"
+          ? `Added “${title}” to favorites`
+          : `Removed “${title}” from favorites`,
+        async () => {
+          if (wasFav) await persistence.addFavoriteAnime(id);
+          else await persistence.removeFavoriteAnime(id);
+        },
+      );
+    } else if (action === "remove") {
+      const prevEntry = await persistence.getLibraryEntry(id);
+      const prevProgress = await persistence.getProgress(id);
+      await persistence.removeLibraryEntry(id);
+      undoToast(`Removed “${title}” from Library`, async () => {
+        if (prevEntry) await persistence.restoreLibraryEntry(prevEntry);
+        await persistence.restoreProgress(id, prevProgress);
+      });
+    } else if (action === "unrate") {
+      const prevRating = await persistence.getAnimeRating(id);
+      await persistence.removeAnimeRating(id);
+      undoToast(`Removed rating for “${title}”`, async () => {
+        if (prevRating) await persistence.restoreAnimeRating(prevRating);
+      });
+    } else if (action === "note" && note) {
+      const saved = await persistence.addNote({ subjectType: "anime", subjectId: id, body: note });
+      undoToast(`Note saved on “${title}”`, async () => {
+        await db.userNotes.delete(saved.id);
+      });
+      try {
+        await tasteService.learnFromNote(saved.id);
+      } catch {
+        /* optional */
+      }
+    } else if (action === "rewatch") {
+      const prevEntry = await persistence.getLibraryEntry(id);
+      const prevProgress = await persistence.getProgress(id);
+      await persistence.rewatchAnime(id);
+      undoToast(`Rewatch started for “${title}” · ep 0`, async () => {
+        if (prevEntry) await persistence.restoreLibraryEntry(prevEntry);
+        else await persistence.removeLibraryEntry(id);
+        await persistence.restoreProgress(id, prevProgress);
+      });
+    } else {
+      return;
+    }
+
+    const convo = await ensureConvo();
+    const reply = actionDoneReply(action, title, polish);
+    await memoryService.appendMessage(convo.id, "assistant", reply);
+    await revealAssistant({ role: "assistant", content: "", polish }, reply);
+  }
+
   function patchLastAssistant(patch: Partial<UiMessage>) {
     setMessages((prev) => {
       const copy = [...prev];
@@ -421,6 +512,37 @@ export default function BuddyPage() {
             polish,
             rateConfirm:
               candidates.length > 0 ? { score: write.score, picks: candidates } : undefined,
+          },
+          reply,
+        );
+        return;
+      }
+
+      if (
+        write?.kind === "favorite" ||
+        write?.kind === "remove" ||
+        write?.kind === "unrate" ||
+        write?.kind === "note" ||
+        write?.kind === "rewatch"
+      ) {
+        const titles = write.titles.length ? write.titles : [write.query];
+        const candidates = await libraryCandidatesForTitles(titles);
+        const action =
+          write.kind === "favorite" && write.unfavorite ? "unfavorite" : write.kind;
+        const reply = actionPromptReply(action, candidates.length, polish);
+        await memoryService.appendMessage(convo.id, "assistant", reply);
+        await revealAssistant(
+          {
+            role: "assistant",
+            polish,
+            actionConfirm:
+              candidates.length > 0
+                ? {
+                    action,
+                    picks: candidates,
+                    note: write.kind === "note" ? write.note : undefined,
+                  }
+                : undefined,
           },
           reply,
         );
@@ -719,6 +841,26 @@ export default function BuddyPage() {
                         score={m.rateConfirm!.score}
                         polish={Boolean(m.polish)}
                         onConfirm={(p) => confirmRating(m.rateConfirm!.score, p, Boolean(m.polish))}
+                      />
+                    ))}
+                  </div>
+                )}
+                {m.actionConfirm && m.actionConfirm.picks.length > 0 && (
+                  <div className="max-w-[85%] space-y-2">
+                    {m.actionConfirm.picks.map((pick) => (
+                      <LibraryConfirmCard
+                        key={`${m.actionConfirm!.action}-${pick.anilistId}`}
+                        pick={pick}
+                        polish={Boolean(m.polish)}
+                        action={ACTION_LABELS[m.actionConfirm!.action] ?? "Confirm"}
+                        onConfirm={(p) =>
+                          confirmAction(
+                            m.actionConfirm!.action,
+                            p,
+                            Boolean(m.polish),
+                            m.actionConfirm!.note,
+                          )
+                        }
                       />
                     ))}
                   </div>

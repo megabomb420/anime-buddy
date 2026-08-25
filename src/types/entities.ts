@@ -79,6 +79,8 @@ export interface LibraryEntry {
   status: LibraryStatus;
   /** Episodes watched. */
   progress: number;
+  /** How many times the user restarted this title ("rewatch X" in Buddy). */
+  rewatchCount?: number;
   startedAt?: number;
   completedAt?: number;
   updatedAt: number;

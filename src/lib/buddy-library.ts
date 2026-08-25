@@ -18,6 +18,39 @@ export interface RateIntent {
   score: number;
 }
 
+export interface FavoriteIntent {
+  kind: "favorite";
+  query: string;
+  titles: string[];
+  /** True for "unfavorite X" / "remove X from favorites". */
+  unfavorite?: boolean;
+}
+
+export interface RemoveIntent {
+  kind: "remove";
+  query: string;
+  titles: string[];
+}
+
+export interface UnrateIntent {
+  kind: "unrate";
+  query: string;
+  titles: string[];
+}
+
+export interface NoteIntent {
+  kind: "note";
+  query: string;
+  titles: string[];
+  note: string;
+}
+
+export interface RewatchIntent {
+  kind: "rewatch";
+  query: string;
+  titles: string[];
+}
+
 export interface LibraryReadIntent {
   kind: "library-read";
   /** Missing = whole library. */
@@ -26,7 +59,12 @@ export interface LibraryReadIntent {
 
 export type BuddyWriteIntent =
   | ({ kind: "library" } & LibraryIntent)
-  | RateIntent;
+  | RateIntent
+  | FavoriteIntent
+  | RemoveIntent
+  | UnrateIntent
+  | NoteIntent
+  | RewatchIntent;
 
 /**
  * Suffix form: "add X to watched" / "dodaj X do obejrzanych".
@@ -84,6 +122,35 @@ const RATE_RES: RegExp[] = [
   /^(.+?)\s+(?:na|at|score)?\s*(\d{1,2}(?:[.,]5)?)\s*\/\s*10\s*$/i,
   /^(?:ocena|score)\s+(\d{1,2}(?:[.,]5)?)\s+(?:dla\s+|for\s+)?(.+)$/i,
 ];
+
+/** "add X to favorites" / "favorite X" / "fav X". */
+const FAVORITE_RES: RegExp[] = [
+  /^add\s+(.+?)\s+to\s+(?:my\s+)?favou?rites\s*$/i,
+  /^(?:favou?rite|fav)\s+(.+)$/i,
+];
+
+/** "remove X from favorites" / "unfavorite X" — checked BEFORE favorite. */
+const UNFAVORITE_RES: RegExp[] = [
+  /^remove\s+(.+?)\s+from\s+(?:my\s+)?favou?rites\s*$/i,
+  /^unfavou?rite\s+(.+)$/i,
+];
+
+/** "remove X from my library" / "delete X from my list". */
+const REMOVE_RES: RegExp[] = [
+  /^(?:remove|delete)\s+(.+?)\s+from\s+(?:my\s+)?(?:library|list)\s*$/i,
+];
+
+/** "unrate X" / "remove my rating for X". */
+const UNRATE_RES: RegExp[] = [
+  /^unrate\s+(.+)$/i,
+  /^remove\s+(?:my\s+)?rating\s+(?:for|of)\s+(.+)$/i,
+];
+
+/** "note Naruto: great fights" — the colon is required. */
+const NOTE_RES: RegExp[] = [/^note(?:\s+for)?\s+(.+?)\s*:\s*(.{3,280})$/i];
+
+/** "rewatch X" / "rewatching X". */
+const REWATCH_RES: RegExp[] = [/^(?:re-?watch(?:ing)?)\s+(.+)$/i];
 
 function statusFromWord(word: string): LibraryStatus {
   const w = word.toLowerCase();
@@ -249,6 +316,76 @@ const LIBRARY_READ: Array<{ status?: LibraryStatus; re: RegExp }> = [
   },
 ];
 
+export function parseFavoriteIntent(raw: string): FavoriteIntent | null {
+  const text = raw.trim();
+  for (const re of UNFAVORITE_RES) {
+    const m = text.match(re);
+    if (m?.[1]) {
+      const query = cleanTitle(m[1]);
+      if (query.length >= 2) return { kind: "favorite", query, titles: [query], unfavorite: true };
+    }
+  }
+  for (const re of FAVORITE_RES) {
+    const m = text.match(re);
+    if (m?.[1]) {
+      const query = cleanTitle(m[1]);
+      if (query.length >= 2) return { kind: "favorite", query, titles: [query] };
+    }
+  }
+  return null;
+}
+
+export function parseRemoveIntent(raw: string): RemoveIntent | null {
+  const text = raw.trim();
+  for (const re of REMOVE_RES) {
+    const m = text.match(re);
+    if (m?.[1]) {
+      const query = cleanTitle(m[1]);
+      if (query.length >= 2) return { kind: "remove", query, titles: [query] };
+    }
+  }
+  return null;
+}
+
+export function parseUnrateIntent(raw: string): UnrateIntent | null {
+  const text = raw.trim();
+  for (const re of UNRATE_RES) {
+    const m = text.match(re);
+    if (m?.[1]) {
+      const query = cleanTitle(m[1]);
+      if (query.length >= 2) return { kind: "unrate", query, titles: [query] };
+    }
+  }
+  return null;
+}
+
+export function parseNoteIntent(raw: string): NoteIntent | null {
+  const text = raw.trim();
+  for (const re of NOTE_RES) {
+    const m = text.match(re);
+    if (m?.[1] && m[2]) {
+      const query = cleanTitle(m[1]);
+      const note = m[2].trim();
+      if (query.length >= 2 && note.length >= 3) {
+        return { kind: "note", query, titles: [query], note };
+      }
+    }
+  }
+  return null;
+}
+
+export function parseRewatchIntent(raw: string): RewatchIntent | null {
+  const text = raw.trim();
+  for (const re of REWATCH_RES) {
+    const m = text.match(re);
+    if (m?.[1]) {
+      const query = cleanTitle(m[1]);
+      if (query.length >= 2) return { kind: "rewatch", query, titles: [query] };
+    }
+  }
+  return null;
+}
+
 /** "what am I watching" — IndexedDB read, no DeepSeek, no catalog invent. */
 export function parseLibraryReadIntent(raw: string): LibraryReadIntent | null {
   const text = raw.trim();
@@ -260,10 +397,20 @@ export function parseLibraryReadIntent(raw: string): LibraryReadIntent | null {
   return null;
 }
 
-/** Library write OR rating — checked before free chat. */
+/** Library write OR rating OR favorite/note/remove/rewatch — checked before free chat. */
 export function parseBuddyWriteIntent(raw: string): BuddyWriteIntent | null {
   const rate = parseRateIntent(raw);
   if (rate) return rate;
+  const note = parseNoteIntent(raw);
+  if (note) return note;
+  const fav = parseFavoriteIntent(raw);
+  if (fav) return fav;
+  const rem = parseRemoveIntent(raw);
+  if (rem) return rem;
+  const unrate = parseUnrateIntent(raw);
+  if (unrate) return unrate;
+  const rewatch = parseRewatchIntent(raw);
+  if (rewatch) return rewatch;
   const lib = parseLibraryIntent(raw);
   if (lib) return { kind: "library", ...lib };
   return null;
@@ -406,4 +553,52 @@ export function rateDoneReply(title: string, score: number, polish: boolean): st
   return polish
     ? `Zapisane. „${title}” → ${score}/10.`
     : `Saved. “${title}” → ${score}/10.`;
+}
+
+// ----- favorite / remove / unrate / note / rewatch replies -----
+
+export function actionPromptReply(
+  action: "favorite" | "unfavorite" | "remove" | "unrate" | "note" | "rewatch",
+  count: number,
+  polish: boolean,
+): string {
+  const verb: Record<typeof action, [string, string]> = {
+    favorite: ["dodać do ulubionych", "add to favorites"],
+    unfavorite: ["usunąć z ulubionych", "remove from favorites"],
+    remove: ["usunąć z biblioteki", "remove from your library"],
+    unrate: ["usunąć ocenę", "remove the rating"],
+    note: ["zapisać notatkę", "save the note"],
+    rewatch: ["ustawić rewatch od odc. 0", "reset to a rewatch from ep 0"],
+  };
+  const [pl, en] = verb[action];
+  if (count === 0) {
+    return polish
+      ? "Nie znalazłem tego w katalogu. Podaj dokładniejszy tytuł."
+      : "Nothing matched the catalog. Give me a clearer title.";
+  }
+  if (count === 1) {
+    return polish
+      ? `To ten? Zatwierdź kartę — ${pl}.`
+      : `This one? Confirm the card — I'll ${en}.`;
+  }
+  return polish
+    ? `Kilka trafień. Zatwierdź właściwą kartę — ${pl}.`
+    : `A few matches. Confirm the right card — I'll ${en}.`;
+}
+
+export function actionDoneReply(
+  action: "favorite" | "unfavorite" | "remove" | "unrate" | "note" | "rewatch",
+  title: string,
+  polish: boolean,
+): string {
+  const done: Record<typeof action, [string, string]> = {
+    favorite: ["jest w ulubionych", "is in favorites"],
+    unfavorite: ["wyleciało z ulubionych", "is out of favorites"],
+    remove: ["usunięte z biblioteki", "removed from your library"],
+    unrate: ["ocena usunięta", "rating removed"],
+    note: ["notatka zapisana", "note saved"],
+    rewatch: ["rewatch od początku", "rewatch started from ep 0"],
+  };
+  const [pl, en] = done[action];
+  return polish ? `Jest. „${title}” — ${pl}.` : `Done. “${title}” — ${en}.`;
 }
