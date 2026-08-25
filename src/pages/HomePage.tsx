@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import {
+  CalendarDays,
   Camera,
   Compass,
   Gem,
@@ -18,7 +19,7 @@ import { PosterRow, SectionHeader } from "@/components/anime/PosterRow";
 import { HeroSkeleton } from "@/components/anime/Skeletons";
 import { AppVersionFooter } from "@/components/AppVersionFooter";
 import { undoToast } from "@/lib/undo";
-import { airingCountdownLabel } from "@/lib/airing";
+import { airingCountdownLabel, airingWeekdayLabel, AIRING_WEEK_MS } from "@/lib/airing";
 import type { AiringInfo } from "@/types/anime";
 import { persistence } from "@/lib/db/persistence";
 import { recommendationService } from "@/lib/services/RecommendationService";
@@ -120,6 +121,7 @@ export default function HomePage() {
   const [surpriseRecs, setSurpriseRecs] = useState<RecommendationRecord | null>(null);
   const [continueWatching, setContinueWatching] = useState<Array<{ anime: AnimeSummary; progress: number }>>([]);
   const [airing, setAiring] = useState<Record<number, AiringInfo>>({});
+  const [thisWeek, setThisWeek] = useState<Array<{ anime: AnimeSummary; info: AiringInfo }>>([]);
   const [loadingTonight, setLoadingTonight] = useState(false);
   const [selectedMinutes, setSelectedMinutes] = useState<number | null>(null);
   const [trending, setTrending] = useState<AnimeSummary[]>([]);
@@ -170,9 +172,26 @@ export default function HomePage() {
         if (anime) cw.push({ anime, progress: entry.progress });
       }
       setContinueWatching(cw);
-      if (cw.length > 0) {
-        const airingMap = await animeCatalogService.getAiringFor(cw.map((c) => c.anime.anilistId));
+
+      // "This week" rail: next episodes of anything on the watching /
+      // plan-to-watch list airing within the next 7 days.
+      const airingIds = library
+        .filter((e) => e.status === "watching" || e.status === "plan_to_watch")
+        .map((e) => e.anilistId);
+      if (airingIds.length > 0) {
+        const airingMap = await animeCatalogService.getAiringFor(airingIds);
         setAiring(Object.fromEntries(airingMap));
+        const soon = [...airingMap.entries()]
+          .filter(([, a]) => a.airingAt <= Date.now() + AIRING_WEEK_MS)
+          .sort((x, y) => x[1].airingAt - y[1].airingAt)
+          .slice(0, 12);
+        const week: Array<{ anime: AnimeSummary; info: AiringInfo }> = [];
+        for (const [id, info] of soon) {
+          const known = cw.find((c) => c.anime.anilistId === id)?.anime;
+          const anime = known ?? (await animeCatalogService.getAnime(id));
+          if (anime) week.push({ anime, info });
+        }
+        setThisWeek(week);
       }
     })();
   }, []);
@@ -447,6 +466,34 @@ export default function HomePage() {
                       {airingCountdownLabel(airing[anime.anilistId].airingAt)}
                     </span>
                   )}
+                  <span className="line-clamp-2 text-xs font-medium">{anime.title.english ?? anime.title.romaji}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {thisWeek.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <h2 className="font-medium">This week</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {thisWeek.map(({ anime, info }) => (
+                <button
+                  key={anime.anilistId}
+                  className="flex w-24 shrink-0 flex-col gap-1 text-left"
+                  onClick={() => navigate(`/anime/${anime.anilistId}`)}
+                >
+                  {anime.coverImage ? (
+                    <img src={anime.coverImage} alt="" className="h-32 w-24 rounded-md object-cover" loading="lazy" />
+                  ) : (
+                    <div className="h-32 w-24 rounded-md bg-muted" />
+                  )}
+                  <span className="text-[10px] font-medium text-primary">
+                    Ep {info.episode} · {airingWeekdayLabel(info.airingAt)}
+                  </span>
                   <span className="line-clamp-2 text-xs font-medium">{anime.title.english ?? anime.title.romaji}</span>
                 </button>
               ))}

@@ -1,6 +1,6 @@
 # Anime Buddy
 
-**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.31**
+**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.32**
 
 **Source:** [github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
 
@@ -14,7 +14,7 @@ UI chrome is **English**. Ren still answers Polish in Polish.
 
 | Screen | What you get |
 | --- | --- |
-| **Home** | Featured hero (rotates every 10s with a slow cover zoom-in, swipe left/right or dots to jump, **Open title** → detail, **Ask Ren** → Buddy with a pre-filled question), trending, **For you** (scored from ratings + library + AniList recs — reason under each poster, Refresh for new picks, Interested / Not for me feedback — “Not for me” hides the title permanently), tonight picks (**time budget is enforced**: only titles that fit the selected minutes, movies ≈ 100 min, episodes × 24 min). **App version + Update** at the bottom. |
+| **Home** | Featured hero (rotates every 10s with a slow cover zoom-in, swipe left/right or dots to jump, **Open title** → detail, **Ask Ren** → Buddy with a pre-filled question), trending, **For you** (scored from ratings + library + AniList recs — reason under each poster, Refresh for new picks, Interested / Not for me feedback — “Not for me” hides the title permanently), **This week** (next episodes of everything you watch or plan to watch, airing within 7 days — “Ep N · Fri”), tonight picks (**time budget is enforced**: only titles that fit the selected minutes, movies ≈ 100 min, episodes × 24 min). **App version + Update** at the bottom. |
 | **Discover** | Live search from 2 letters (covers). Trending / Seasonal / Popular. iOS safe-area header. |
 | **Scan** | Camera or photo of a figurine / character art → AniList match. Every scan lands in **Recent scans** (photo shelf, deletable), matches offer **Ask Ren** (opens Buddy with a pre-filled question), Open anime, Character and Plan to watch. |
 | **Library** | Watching, want to watch, completed. Same safe-area as Discover. Filter within your list, sort (Recent / Title / My rating / Progress), list or poster-grid view (choice remembered), next-episode countdown on airing titles. |
