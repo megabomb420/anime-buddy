@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { AgeBadge } from "@/components/AgeBadge";
 import { persistence } from "@/lib/db/persistence";
 import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
+import { airingCountdownLabel } from "@/lib/airing";
 import { db } from "@/lib/db/database";
-import type { AnimeSummary } from "@/types/anime";
+import type { AiringInfo, AnimeSummary } from "@/types/anime";
 import type { LibraryEntry, LibraryStatus } from "@/types/entities";
 
 const SECTIONS: Array<{ status: LibraryStatus; label: string }> = [
@@ -21,10 +22,12 @@ function LibraryItem({
   entry,
   anime,
   isFav,
+  airing,
 }: {
   entry: LibraryEntry;
   anime?: AnimeSummary;
   isFav: boolean;
+  airing?: AiringInfo;
 }) {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(entry.progress);
@@ -67,6 +70,12 @@ function LibraryItem({
             <Plus className="h-3 w-3" />
           </Button>
         </div>
+
+        {entry.status === "watching" && airing && (
+          <p className="text-[11px] font-medium text-primary">
+            Next: Ep {airing.episode} · {airingCountdownLabel(airing.airingAt)}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -76,6 +85,7 @@ export default function LibraryPage() {
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [animeMap, setAnimeMap] = useState<Record<number, AnimeSummary>>({});
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
+  const [airing, setAiring] = useState<Record<number, AiringInfo>>({});
   const [activeTab, setActiveTab] = useState<LibraryStatus | "all">("all");
   const navigate = useNavigate();
 
@@ -92,6 +102,12 @@ export default function LibraryPage() {
         if (a) map[e.anilistId] = a;
       }
       setAnimeMap(map);
+
+      const watchingIds = all.filter((e) => e.status === "watching").map((e) => e.anilistId);
+      if (watchingIds.length > 0) {
+        const airingMap = await animeCatalogService.getAiringFor(watchingIds);
+        setAiring(Object.fromEntries(airingMap));
+      }
     })();
   }, []);
 
@@ -131,7 +147,13 @@ export default function LibraryPage() {
 
       <div className="space-y-3">
         {displayed.map((e) => (
-          <LibraryItem key={e.anilistId} entry={e} anime={animeMap[e.anilistId]} isFav={favorites.has(e.anilistId)} />
+          <LibraryItem
+            key={e.anilistId}
+            entry={e}
+            anime={animeMap[e.anilistId]}
+            isFav={favorites.has(e.anilistId)}
+            airing={airing[e.anilistId]}
+          />
         ))}
       </div>
 

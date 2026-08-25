@@ -93,6 +93,13 @@ export interface AnimeSummary {
   cachedAt: number;
 }
 
+export interface AiringInfo {
+  /** Next episode number. */
+  episode: number;
+  /** Epoch ms when it airs. */
+  airingAt: number;
+}
+
 export interface CharacterSummary {
   /** AniList character id. */
   id: number;

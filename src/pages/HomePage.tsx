@@ -18,6 +18,8 @@ import { PosterRow, SectionHeader } from "@/components/anime/PosterRow";
 import { HeroSkeleton } from "@/components/anime/Skeletons";
 import { AppVersionFooter } from "@/components/AppVersionFooter";
 import { undoToast } from "@/lib/undo";
+import { airingCountdownLabel } from "@/lib/airing";
+import type { AiringInfo } from "@/types/anime";
 import { persistence } from "@/lib/db/persistence";
 import { recommendationService } from "@/lib/services/RecommendationService";
 import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
@@ -117,6 +119,7 @@ export default function HomePage() {
   const [hiddenGemRecs, setHiddenGemRecs] = useState<RecommendationRecord | null>(null);
   const [surpriseRecs, setSurpriseRecs] = useState<RecommendationRecord | null>(null);
   const [continueWatching, setContinueWatching] = useState<Array<{ anime: AnimeSummary; progress: number }>>([]);
+  const [airing, setAiring] = useState<Record<number, AiringInfo>>({});
   const [loadingTonight, setLoadingTonight] = useState(false);
   const [selectedMinutes, setSelectedMinutes] = useState<number | null>(null);
   const [trending, setTrending] = useState<AnimeSummary[]>([]);
@@ -167,6 +170,10 @@ export default function HomePage() {
         if (anime) cw.push({ anime, progress: entry.progress });
       }
       setContinueWatching(cw);
+      if (cw.length > 0) {
+        const airingMap = await animeCatalogService.getAiringFor(cw.map((c) => c.anime.anilistId));
+        setAiring(Object.fromEntries(airingMap));
+      }
     })();
   }, []);
 
@@ -434,6 +441,12 @@ export default function HomePage() {
                     <div className="h-32 w-24 rounded-md bg-muted" />
                   )}
                   <span className="text-[10px] text-muted-foreground">Ep {progress}</span>
+                  {airing[anime.anilistId] && (
+                    <span className="text-[10px] font-medium text-primary">
+                      Next: Ep {airing[anime.anilistId].episode} ·{" "}
+                      {airingCountdownLabel(airing[anime.anilistId].airingAt)}
+                    </span>
+                  )}
                   <span className="line-clamp-2 text-xs font-medium">{anime.title.english ?? anime.title.romaji}</span>
                 </button>
               ))}

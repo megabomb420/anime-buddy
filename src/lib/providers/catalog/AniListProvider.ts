@@ -6,6 +6,7 @@
  */
 
 import type { AnimeSummary, CharacterSummary } from "@/types/anime";
+import type { AiringInfo } from "@/types/anime";
 import type { CatalogProvider } from "./types";
 
 const ANILIST_URL = "https://graphql.anilist.co";
@@ -342,5 +343,38 @@ export class AniListProvider implements CatalogProvider {
       .map((n) => n?.mediaRecommendation)
       .filter((m): m is AnilistMedia => Boolean(m?.id))
       .map(toSummary);
+  }
+
+  /** One batched query: next airing episode for a set of ids (watching list). */
+  async getAiringSchedule(ids: number[]): Promise<Map<number, AiringInfo>> {
+    const out = new Map<number, AiringInfo>();
+    if (ids.length === 0) return out;
+    const data = await gql<{
+      Page: {
+        media: Array<{
+          id: number;
+          nextAiringEpisode?: { episode: number; airingAt: number } | null;
+        }>;
+      };
+    }>(
+      `query ($ids: [Int], $perPage: Int!) {
+        Page(perPage: $perPage) {
+          media(id_in: $ids, type: ANIME) {
+            id
+            nextAiringEpisode { episode airingAt }
+          }
+        }
+      }`,
+      { ids: ids.slice(0, 50), perPage: 50 },
+    );
+    for (const m of data.Page.media) {
+      if (m.nextAiringEpisode) {
+        out.set(m.id, {
+          episode: m.nextAiringEpisode.episode,
+          airingAt: m.nextAiringEpisode.airingAt * 1000,
+        });
+      }
+    }
+    return out;
   }
 }

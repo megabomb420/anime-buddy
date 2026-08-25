@@ -15,6 +15,7 @@ import {
 import { persistence } from "@/lib/db/persistence";
 import { providers } from "@/lib/providers";
 import type { AnimeSummary, CharacterSummary } from "@/types/anime";
+import type { AiringInfo } from "@/types/anime";
 
 const MAL_EXTRAS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const AVAILABILITY_TTL_MS = 24 * 60 * 60 * 1000;
@@ -161,6 +162,19 @@ export class AnimeCatalogService {
     const fresh = await providers.catalog.getCharacter(characterId);
     if (fresh) await persistence.cacheCharacter(fresh);
     return fresh;
+  }
+
+  /** Fresh next-episode airing info for a set of ids. Not cached — always live. */
+  async getAiringFor(ids: number[]): Promise<Map<number, AiringInfo>> {
+    const anilist = providers.catalog as unknown as {
+      getAiringSchedule(ids: number[]): Promise<Map<number, AiringInfo>>;
+    };
+    if (typeof anilist.getAiringSchedule !== "function" || ids.length === 0) return new Map();
+    try {
+      return await anilist.getAiringSchedule(ids);
+    } catch {
+      return new Map();
+    }
   }
 
   async enrichWithMalExtras(anime: AnimeSummary): Promise<AnimeSummary> {
