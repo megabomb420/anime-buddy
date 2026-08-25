@@ -90,9 +90,13 @@ export class RecommendationService {
   private async buildHardConstraints(region: string, requireCrunchyroll: boolean): Promise<HardConstraints> {
     const settings = await persistence.getSettings();
     const library = await persistence.getLibrary();
+    const hidden = await persistence.getHiddenAnime().catch(() => []);
     return {
       maxAge: settings.contentVisibility === "family" ? (settings.maxAge ?? 12) : undefined,
-      excludeAnilistIds: library.map((e) => e.anilistId),
+      excludeAnilistIds: [
+        ...library.map((e) => e.anilistId),
+        ...hidden.map((h) => h.anilistId),
+      ],
       mustBeOnCrunchyroll: requireCrunchyroll,
       region,
     };
@@ -260,16 +264,18 @@ export class RecommendationService {
    * (recommendations + genre lists + trending). No invented titles.
    */
   async forYou(limit = 12, opts?: ForYouOptions): Promise<ForYouResult> {
-    const [library, ratings, favorites, settings] = await Promise.all([
+    const [library, ratings, favorites, settings, hidden] = await Promise.all([
       persistence.getLibrary(),
       persistence.getAnimeRatings(),
       persistence.getFavoriteAnime(),
       persistence.getSettings(),
+      persistence.getHiddenAnime().catch(() => []),
     ]);
 
     const ratingMap = new Map(ratings.map((r) => [r.anilistId, r.score]));
     const favSet = new Set(favorites.map((f) => f.anilistId));
     const exclude = new Set(library.map((e) => e.anilistId));
+    for (const h of hidden) exclude.add(h.anilistId);
     for (const id of opts?.excludeIds ?? []) exclude.add(id);
 
     const anchors: TasteAnchor[] = [];
@@ -384,6 +390,10 @@ export class RecommendationService {
     recommendationId?: string,
   ): Promise<void> {
     await persistence.addRecommendationFeedback({ anilistId, feedback, recommendationId });
+    if (feedback === "not_for_me") {
+      // Permanent exclusion from every recommendation surface.
+      await persistence.hideAnime(anilistId, "not_for_me");
+    }
     const anime = await persistence.getCachedAnime(anilistId);
     if (anime && (feedback === "like" || feedback === "dislike")) {
       const weight = feedback === "like" ? 0.4 : -0.4;

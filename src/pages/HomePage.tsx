@@ -17,6 +17,7 @@ import { FeaturedHero } from "@/components/anime/Hero";
 import { PosterRow, SectionHeader } from "@/components/anime/PosterRow";
 import { HeroSkeleton } from "@/components/anime/Skeletons";
 import { AppVersionFooter } from "@/components/AppVersionFooter";
+import { undoToast } from "@/lib/undo";
 import { persistence } from "@/lib/db/persistence";
 import { recommendationService } from "@/lib/services/RecommendationService";
 import { animeCatalogService } from "@/lib/services/AnimeCatalogService";
@@ -207,6 +208,10 @@ export default function HomePage() {
     if (kind === "not_for_me") {
       forYouExcludedRef.current.add(anilistId);
       setForYou((items) => items.filter((a) => a.anilistId !== anilistId));
+      undoToast("Hidden from recommendations", async () => {
+        await persistence.unhideAnime(anilistId);
+        forYouExcludedRef.current.delete(anilistId);
+      });
     }
   }
 

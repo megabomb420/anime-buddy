@@ -16,6 +16,7 @@ import type {
   Conversation,
   CrunchyrollAvailabilityRecord,
   ExternalIdMapping,
+  HiddenAnime,
   LibraryEntry,
   LibraryStatus,
   Message,
@@ -363,6 +364,20 @@ export const persistence = {
     const record: RecommendationFeedback = { ...input, id: newId(), createdAt: now() };
     await db.recommendationFeedback.put(record);
     return record;
+  },
+
+  // ----- permanent "Not for me" exclusions -----
+
+  async hideAnime(anilistId: number, reason?: string): Promise<void> {
+    await db.hiddenAnime.put({ anilistId, reason, createdAt: now() });
+  },
+
+  async unhideAnime(anilistId: number): Promise<void> {
+    await db.hiddenAnime.delete(anilistId);
+  },
+
+  async getHiddenAnime(): Promise<HiddenAnime[]> {
+    return db.hiddenAnime.toArray();
   },
 
   // ----- export/import (whole personal dataset) -----

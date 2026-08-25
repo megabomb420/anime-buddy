@@ -24,6 +24,7 @@ import type {
   ExternalIdMapping,
   FavoriteAnime,
   FavoriteCharacter,
+  HiddenAnime,
   LibraryEntry,
   Message,
   RecommendationFeedback,
@@ -39,7 +40,7 @@ import type {
 } from "@/types/entities";
 
 export const DB_NAME = "anime-buddy";
-export const DB_SCHEMA_VERSION = 1;
+export const DB_SCHEMA_VERSION = 2;
 
 export class AnimeBuddyDB extends Dexie {
   userProfiles!: Table<UserProfile, string>;
@@ -61,6 +62,7 @@ export class AnimeBuddyDB extends Dexie {
   semanticMemories!: Table<SemanticMemory, string>;
   recommendations!: Table<RecommendationRecord, string>;
   recommendationFeedback!: Table<RecommendationFeedback, string>;
+  hiddenAnime!: Table<HiddenAnime, number>;
   conversations!: Table<Conversation, string>;
   messages!: Table<Message, string>;
   spoilerStates!: Table<SpoilerState, number>;
@@ -94,6 +96,11 @@ export class AnimeBuddyDB extends Dexie {
       messages: "id, conversationId, createdAt",
       spoilerStates: "anilistId, updatedAt",
       settings: "id",
+    });
+
+    // v2 — permanent "Not for me" exclusions.
+    this.version(2).stores({
+      hiddenAnime: "anilistId, createdAt",
     });
 
     // Example for future migrations — add a new version, never edit v1:

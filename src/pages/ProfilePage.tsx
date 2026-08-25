@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import {
   BarChart3,
   Download,
+  EyeOff,
   Library,
   Settings,
   Star,
@@ -50,6 +51,7 @@ export default function ProfilePage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [genreDistribution, setGenreDistribution] = useState<Record<string, number>>({});
   const [ratingDistribution, setRatingDistribution] = useState<Record<number, number>>({});
+  const [hiddenList, setHiddenList] = useState<Array<{ anilistId: number; title: string }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [versionCheck, setVersionCheck] = useState<VersionCheck | null>(null);
   const [rebuildingTaste, setRebuildingTaste] = useState(false);
@@ -112,8 +114,24 @@ export default function ProfilePage() {
         dist[r.score] = (dist[r.score] || 0) + 1;
       }
       setRatingDistribution(dist);
+
+      const hidden = await persistence.getHiddenAnime().catch(() => []);
+      const resolved: Array<{ anilistId: number; title: string }> = [];
+      for (const h of hidden) {
+        const cached = await persistence.getCachedAnime(h.anilistId);
+        resolved.push({
+          anilistId: h.anilistId,
+          title: cached?.title.english ?? cached?.title.romaji ?? `Anime #${h.anilistId}`,
+        });
+      }
+      setHiddenList(resolved);
     })();
   }, []);
+
+  async function unhide(anilistId: number) {
+    await persistence.unhideAnime(anilistId);
+    setHiddenList((prev) => prev.filter((h) => h.anilistId !== anilistId));
+  }
 
   async function setVisibility(value: ContentVisibility) {
     setSettings(await persistence.updateSettings({ contentVisibility: value }));
@@ -324,6 +342,31 @@ export default function ProfilePage() {
             Caps come from Library progress. Ren still never invents plot.
           </p>
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-medium flex items-center gap-2">
+          <EyeOff className="h-4 w-4" /> Hidden titles
+        </h2>
+        {hiddenList.length > 0 ? (
+          <ul className="space-y-1.5">
+            {hiddenList.map((h) => (
+              <li
+                key={h.anilistId}
+                className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2"
+              >
+                <span className="min-w-0 flex-1 truncate text-sm">{h.title}</span>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => void unhide(h.anilistId)}>
+                  Unhide
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            “Not for me” titles are hidden from For you, Tonight and Buddy picks — forever, until you unhide them here.
+          </p>
+        )}
       </section>
 
       <section className="space-y-3">

@@ -235,6 +235,14 @@ export interface RecommendationFeedback {
   createdAt: number;
 }
 
+/** Permanently hidden title ("Not for me") — excluded from every rec surface. */
+export interface HiddenAnime {
+  /** AniList anime id (primary key). */
+  anilistId: number;
+  reason?: string;
+  createdAt: number;
+}
+
 // ---------- Conversations ----------
 
 export interface Conversation {
