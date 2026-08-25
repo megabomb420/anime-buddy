@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-25  
 **App version:** `0.3.34`<br>
-**HEAD:** `main` @ v0.3.34 (use `git log -1` for the commit SHA)<br>
+**Release commit:** `3b030e8` — Ship 0.3.34: align Ren cards and expose features<br>
 **Live PWA:** https://megabomb420.github.io/anime-buddy/  
 **Source:** https://github.com/megabomb420/anime-buddy  
 **Worker:** https://anime-buddy-worker.whip-blanket.workers.dev  
@@ -50,10 +50,10 @@ When debugging “Buddy doesn’t find X”: catalog-search normalization (`×`/
 
 | Surface | State |
 | --- | --- |
-| Pages | **v0.3.34** after the Pages workflow completes — `version.json` must match `package.json` |
+| Pages | **v0.3.34 live** — verified 2026-08-25; `version.json` matches `package.json` |
 | Worker `/api/health` | `{ ok, vision:true, tmdb:false, chat:"sse", thinking:true, tools:true, catalog:"anilist" }` |
 | Worker tools | Live. Persona includes spoiler lock and Ren/card alignment. |
-| Worker GitHub Action | Configured and green since 2026-08-24. It runs on `worker/**` changes or manually. Secrets live in Settings → Secrets → **Actions**. Token scope: Cloudflare **Edit Cloudflare Workers** template |
+| Worker GitHub Action | Green for `3b030e8` (run 10, 2026-08-25). It runs on `worker/**` changes or manually. Secrets live in Settings → Secrets → **Actions**. Token scope: Cloudflare **Edit Cloudflare Workers** template |
 | Owner CLI | `wrangler` owner login works as a fallback; CI is primary. Do not put account emails or IDs in this public file. |
 
 If the phone still shows an old footer: clear site data for `megabomb420.github.io`. Footer must read **v0.3.34**.
@@ -194,7 +194,7 @@ Rule stays: **LLM talks / plans; AniList is facts; user confirms writes.**
 
 - Read this file first.
 - Small commits. Push `main` for Pages.
-- Worker changes: CLI deploy + health check, or admit you cannot.
+- Worker changes: push `main`, verify the **Deploy Worker** Action and `/api/health`; use CLI deploy only as the owner fallback.
 - Keep Ren router order.
 - Never invent anime metadata; resolve via AniList ids.
 - User-facing change → handover + README same window.
