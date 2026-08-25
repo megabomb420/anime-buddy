@@ -1,6 +1,6 @@
 # Anime Buddy
 
-**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.24**
+**Live:** [megabomb420.github.io/anime-buddy](https://megabomb420.github.io/anime-buddy/) · **v0.3.25**
 
 **Source:** [github.com/megabomb420/anime-buddy](https://github.com/megabomb420/anime-buddy)
 
@@ -14,7 +14,7 @@ UI chrome is **English**. Ren still answers Polish in Polish.
 
 | Screen | What you get |
 | --- | --- |
-| **Home** | Featured hero (rotates every 10s with a slow cover zoom-in, swipe left/right or dots to jump, **Open title** → detail, **Ask Ren** → Buddy with a pre-filled question), trending, **For you** (scored from ratings + library + AniList recs — reason under each poster, Refresh for new picks, Interested / Not for me feedback), tonight picks. **App version + Update** at the bottom. |
+| **Home** | Featured hero (rotates every 10s with a slow cover zoom-in, swipe left/right or dots to jump, **Open title** → detail, **Ask Ren** → Buddy with a pre-filled question), trending, **For you** (scored from ratings + library + AniList recs — reason under each poster, Refresh for new picks, Interested / Not for me feedback — “Not for me” hides the title permanently), tonight picks (**time budget is enforced**: only titles that fit the selected minutes, movies ≈ 100 min, episodes × 24 min). **App version + Update** at the bottom. |
 | **Discover** | Live search from 2 letters (covers). Trending / Seasonal / Popular. iOS safe-area header. |
 | **Scan** | Camera or photo of a figurine / character art → AniList match |
 | **Library** | Watching, want to watch, completed. Same safe-area as Discover. |

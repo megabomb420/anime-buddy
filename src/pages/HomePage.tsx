@@ -266,6 +266,7 @@ export default function HomePage() {
         query: minutes < 9999 ? `Something I can finish in about ${minutes} minutes` : "Something binge-worthy",
         context: "tonight",
         requireCrunchyroll: false,
+        timeBudgetMinutes: minutes,
       });
       setTonightRecs(rec);
     } catch {

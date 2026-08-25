@@ -160,6 +160,7 @@ async function catalogPicksFor(text: string): Promise<{ picks: RecPick[]; factsT
     requireCrunchyroll: false,
     localOnly: !getWorkerUrl(),
     candidateLimit: 24,
+    timeBudgetMinutes: prompt.timeBudgetMinutes,
   });
   const animes: AnimeSummary[] = [];
   const picks: RecPick[] = [];

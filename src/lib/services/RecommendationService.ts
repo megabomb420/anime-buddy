@@ -21,6 +21,7 @@ import { passesContentPolicy } from "@/lib/age/normalize";
 import { isConfirmedOnCrunchyroll } from "@/lib/availability/resolve";
 import { isVagueCatalogQuery } from "@/lib/buddy-intent";
 import { persistence } from "@/lib/db/persistence";
+import { fitsTimeBudget } from "@/lib/time-budget";
 import { animeTitle } from "@/lib/media";
 import { providers } from "@/lib/providers";
 import {
@@ -58,6 +59,8 @@ export interface RecommendOptions {
   candidateLimit?: number;
   /** Home recs stay Crunchyroll-first. Ren chat recs skip this so covers always show. */
   requireCrunchyroll?: boolean;
+  /** Hard "finishable in N minutes" filter (Tonight). 9999+ = no limit. */
+  timeBudgetMinutes?: number;
 }
 
 function currentSeason(): { season: string; year: number } {
@@ -190,6 +193,14 @@ export class RecommendationService {
       }),
     );
 
+    let usedBudgetFallback = false;
+    const budget = options.timeBudgetMinutes;
+    if (budget != null && budget < 9999) {
+      const fits = candidates.filter((c) => fitsTimeBudget(c, budget));
+      if (fits.length > 0) candidates = fits;
+      else usedBudgetFallback = true;
+    }
+
     let pool = candidates;
     let fellBackToCandidates = false;
 
@@ -239,9 +250,12 @@ export class RecommendationService {
       items = this.localFallback(scored);
     }
 
-    const reasonSuffix = fellBackToCandidates
+    let reasonSuffix = fellBackToCandidates
       ? " (Crunchyroll availability unconfirmed — shown as candidate)"
       : "";
+    if (usedBudgetFallback) {
+      reasonSuffix += " (nothing fits that time budget — shortest matches shown)";
+    }
     if (reasonSuffix) {
       items = items.map((i) => ({ ...i, reason: i.reason + reasonSuffix }));
     }
