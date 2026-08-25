@@ -6,6 +6,7 @@ import {
   EyeOff,
   Library,
   Settings,
+  Share2,
   Star,
   Upload,
   User,
@@ -28,6 +29,7 @@ import { toast } from "sonner";
 import { applyAniListImport } from "@/lib/anilist-import-apply";
 import { fetchAniListList, type AniListImportPreview } from "@/lib/anilist-import";
 import { tasteService } from "@/lib/services/TasteService";
+import { shareTasteCard } from "@/lib/taste-card";
 import type {
   ContentVisibility,
   Settings as SettingsType,
@@ -81,6 +83,29 @@ export default function ProfilePage() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importBusy, setImportBusy] = useState(false);
   const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
+  const [sharingCard, setSharingCard] = useState(false);
+
+  async function shareTaste() {
+    if (sharingCard) return;
+    setSharingCard(true);
+    try {
+      const result = await shareTasteCard({
+        summary: taste?.summary ?? null,
+        genres: Object.entries(genreDistribution).map(([genre, weight]) => ({ genre, weight })),
+        stats: stats
+          ? { completed: stats.completed, avgRating: stats.avgRating, totalHours: stats.totalHours }
+          : null,
+      });
+      toast(result === "shared" ? "Taste DNA card shared" : "Taste DNA card saved as PNG");
+    } catch (err) {
+      // User cancelling the share sheet throws an AbortError — stay quiet for that.
+      if (!(err instanceof Error && err.name === "AbortError")) {
+        toast.error("Could not create the card.");
+      }
+    } finally {
+      setSharingCard(false);
+    }
+  }
 
   async function previewImport() {
     if (importBusy) return;
@@ -303,15 +328,29 @@ export default function ProfilePage() {
           <h2 className="font-medium flex items-center gap-2">
             <Star className="h-4 w-4" /> Taste DNA
           </h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs"
-            disabled={rebuildingTaste}
-            onClick={() => void rebuildTaste()}
-          >
-            {rebuildingTaste ? "Asking DeepSeek…" : "Rebuild"}
-          </Button>
+          <div className="flex items-center gap-1">
+            {(taste?.summary || Object.values(genreDistribution).some((w) => w > 0)) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs"
+                disabled={sharingCard}
+                onClick={() => void shareTaste()}
+              >
+                <Share2 className="mr-1 h-3 w-3" />
+                {sharingCard ? "Drawing…" : "Share"}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs"
+              disabled={rebuildingTaste}
+              onClick={() => void rebuildTaste()}
+            >
+              {rebuildingTaste ? "Asking DeepSeek…" : "Rebuild"}
+            </Button>
+          </div>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           {taste?.summary ? (
